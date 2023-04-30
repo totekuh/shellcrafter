@@ -4,6 +4,9 @@ requires = [
     "wheel",
     "numpy",
     "keystone-engine",
-    "termcolor"
+    "termcolor",
+    "rich",
+    "ropper",
+    "capstone"
 ]
 build-backend = "setuptools.build_meta"
