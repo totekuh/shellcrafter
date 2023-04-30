@@ -1,4 +1,0 @@
-ropper
-numpy
-rich
-
