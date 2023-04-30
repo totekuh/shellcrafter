@@ -23,6 +23,7 @@ def str_to_hex_little_endian_push(s):
         hex_str = '0' * (8 - len(hex_str) % 8) + hex_str
     result = os.linesep.join([hex_str[i:i + 8] for i in range(0, len(hex_str), 8)])
     result = [f"push 0x{h}" for h in result.split(os.linesep)]
+    result.reverse()
     for h in result:
         print(h)
 
