@@ -6,11 +6,18 @@ It provides a collection of utilities for working with shellcode in various ways
 
 ## Installation
 
-To install Shellcrafter, clone the repository and run:
+To install Shellcrafter, use pip:
 
 ```bash
-pip install .
+pip3 install shellcrafter
 ```
+
+Or clone this repository and run:
+
+```bash
+pip3 install .
+```
+
 
 ## Usage
 
@@ -23,7 +30,7 @@ Shellcrafter provides the following command-line utilities:
 To get help on how to use each utility, run the corresponding command with the `-h` or `--help` flag:
 
 ```bash
-keyst-apir --help
+keyst-api --help
 compute-hashes-from-function-name --help
 ascii-to-push --help
 ```
