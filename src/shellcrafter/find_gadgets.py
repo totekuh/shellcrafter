@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-import re
-import sys
-import shutil
 import argparse
-import tempfile
-import subprocess
-from pathlib import Path
 import multiprocessing
 import platform
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
 
 og_print = print
 from rich import print
@@ -167,7 +167,6 @@ def add_missing_gadgets(ropper_addresses: set, in_file, outfile, bad_bytes, base
 
         subprocess.run(f'{wget} https://github.com/0vercl0k/rp/releases/download/v2.0.2/{fname} -O {rp}'.split())
 
-
         rp.chmod(mode=0o755)
 
     with tempfile.TemporaryFile(mode='w+', suffix='osed-rop') as tmp_file, open(outfile, 'a') as af:
@@ -224,7 +223,6 @@ def clean_up_all_gadgets(outfile):
 
 
 def print_useful_regex(outfile, arch):
-
     reg_prefix = "e" if arch == "x86" else "r"
     len_sort = "| awk '{ print length, $0 }' | sort -n -s -r | cut -d' ' -f2- | tail"
     any_reg = f'{reg_prefix}..'
@@ -254,11 +252,13 @@ def print_useful_regex(outfile, arch):
         og_print(f"egrep '{term}' {outfile} {len_sort}")
 
 
-def main(args):
+def main():
+    args = get_arguments()
+
     if platform.system() == "Darwin":
-        #Fix issue with Ropper in macOS -> AttributeError: 'Ropper' object has no attribute '__gatherGadgetsByEndings'
+        # Fix issue with Ropper in macOS -> AttributeError: 'Ropper' object has no attribute '__gatherGadgetsByEndings'
         multiprocessing.set_start_method('fork')
-    
+
     g = Gadgetizer(args.files, args.bad_chars, args.output, args.arch, args.color)
 
     tree = Tree(
@@ -290,7 +290,7 @@ def main(args):
     print_useful_regex(args.output, args.arch)
 
 
-if __name__ == "__main__":
+def get_arguments():
     parser = argparse.ArgumentParser(
         description="Searches for clean, categorized gadgets from a given list of files"
     )
@@ -335,7 +335,8 @@ if __name__ == "__main__":
         action='store_true',
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
-    main(args)
 
+if __name__ == "__main__":
+    main()
