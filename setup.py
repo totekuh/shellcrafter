@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-version = "1.0.3"
+version = "1.0.4"
 
 from setuptools import setup, find_packages
 
@@ -24,6 +24,7 @@ setup(
             "ascii-to-push=shellcrafter.ascii_hex_stack_push_converter:main",
         ],
     },
+    url='https://github.com/totekuh/shellcrafter',  # Optional
     install_requires=[
         "numpy",
         "keystone-engine",
@@ -32,4 +33,9 @@ setup(
         "ropper",
         'capstone'
     ],
+    project_urls={  # Optional
+        'Bug Reports': 'https://github.com/totekuh/shellcrafter/issues',
+        'Source': 'https://github.com/totekuh/shellcrafter',
+    },
+
 )
