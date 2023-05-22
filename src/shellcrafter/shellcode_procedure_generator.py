@@ -49,20 +49,21 @@ def str_to_hex_little_endian_push(s, null_free=False):
     result = os.linesep.join([hex_str[i:i + 8] for i in range(0, len(hex_str), 8)])
     result = [f"push 0x{h}" for h in result.split(os.linesep)]
 
-    for h in result:
+    for index, h in enumerate(result):
+        part = s[index * 4: index * 4 + 4]
         if null_free:
             for i in range(5, len(h), 2):
                 if h[i:i + 2] == '00':
                     negated_value = negate_hex(h[5:])
                     print(
-                        f"mov eax, {negated_value} ;# Move the negated value of the next part of the string \"{s}\" to EAX to avoid NULL bytes\n"
-                        f"neg eax ;# Negate EAX to get the original value\n"
-                        f"push eax ;# Push EAX onto the stack")
+                        f"mov eax, {negated_value} ;# Move the negated value of the part \"{part}\" of the string \"{s}\" to EAX to avoid NULL bytes")
+                    print("neg eax ;# Negate EAX to get the original value")
+                    print("push eax ;# Push EAX onto the stack")
                     break
             else:
-                print(f"{h} ;# Push the next part of the string \"{s}\" onto the stack")
+                print(f"{h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
         else:
-            print(f"{h} ;# Push the next part of the string \"{s}\" onto the stack")
+            print(f"{h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
 
 
 def generate_load_library(dll_name: str, load_library_addr: str, null_free=False):
