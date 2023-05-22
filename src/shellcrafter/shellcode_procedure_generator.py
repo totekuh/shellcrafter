@@ -108,21 +108,23 @@ def str_to_hex_little_endian_push(s, null_free=False):
                 if h[i:i + 2] == '00':
                     negated_value = negate_hex(h[5:])
                     print(
-                        f"mov eax, {negated_value} ;# Move the negated value of the part \"{part}\" of the string \"{s}\" to EAX to avoid NULL bytes")
-                    print("neg eax ;# Negate EAX to get the original value")
-                    print("push eax ;# Push EAX onto the stack")
+                        f"  mov eax, {negated_value} ;# Move the negated value of the part \"{part}\" of the string \"{s}\" to EAX to avoid NULL bytes")
+                    print("  neg eax ;# Negate EAX to get the original value")
+                    print("  push eax ;# Push EAX onto the stack")
                     break
             else:
-                print(f"{h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
+                print(f"  {h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
         else:
-            print(f"{h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
+            print(f"  {h} ;# Push the part \"{part}\" of the string \"{s}\" onto the stack")
 
 
-def generate_load_library(dll_name: str, load_library_addr: str, null_free=False):
-    print("xor eax, eax ;# NULL EAX")
+def generate_load_library(dll_name: str, load_library_func_addr: str, null_free=False):
+    print(f"load_lib:  ;# load the {dll_name} DLL")
+    print("  xor eax, eax ;# NULL EAX")
     str_to_hex_little_endian_push(dll_name, null_free=null_free)
-    print("push esp ;# Push ESP to have a pointer to the string that is currently located on the stack")
-    print(f"call dword ptr {load_library_addr} ;# Call LoadLibraryA")
+    print("  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack")
+    print(f"  call dword ptr {load_library_func_addr} ;# Call LoadLibraryA")
+
 
 def main():
     options = get_arguments()
@@ -134,12 +136,13 @@ def main():
         if not options.ascii_string:
             print("Error: --ascii-string is required when --push-for-ascii is given.")
             sys.exit(1)
+        print(f"push_str:  ;# push the '{options.ascii_string}' onto the stack")
         str_to_hex_little_endian_push(s=options.ascii_string, null_free=options.null_free)
     elif options.load_library:
         if not options.load_library_dll_name or not options.load_library_addr:
             print("Error: --load-library-dll-name and --load-library-addr are required when --load-library is given.")
             sys.exit(1)
-        generate_load_library(dll_name=options.load_library_dll_name, load_library_addr=options.load_library_addr, null_free=options.null_free)
+        generate_load_library(dll_name=options.load_library_dll_name, load_library_func_addr=options.load_library_addr, null_free=options.null_free)
     else:
         print("Error: Either --push-for-ascii or --load-library must be given.")
         sys.exit(1)
