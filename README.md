@@ -24,7 +24,7 @@ $ pip3 install .
 Shellcrafter provides the following command-line utilities:
 
 - `keyst-api`: A shellcode generator using the Keystone Engine to assemble assembly instructions into shellcode.
-- `shellcode-procedure-generator`: A versatile tool for generating assembly instructions for various purposes. It can generate push instructions for ASCII strings, instructions for loading a DLL, and compute a hash of an input string using an algorithm similar to the one used in assembly for importing a function by its hash. It also provides an option to avoid NULL bytes in the generated shellcode.
+- `shellcode-procedure-generator`: A versatile tool for generating assembly instructions for various purposes. It can generate push instructions for ASCII strings, instructions for loading a DLL, write ASCII strings to memory, and compute a hash of an input string using an algorithm similar to the one used in assembly for importing a function by its hash. It also provides an option to avoid NULL bytes in the generated shellcode.
 - `find-gadgets`: Searches for clean, categorized gadgets from a given list of files.
 
 To get help on how to use each utility, run the corresponding command with the `-h` or `--help` flag:
@@ -90,6 +90,39 @@ load_lib:  ;# load the shell32.dll DLL
   push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
   push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
   call dword ptr [ebp+0x10] ;# Call LoadLibraryA
+```
+
+To generate instructions for writing an ASCII string to memory:
+
+```bash
+$ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]"
+write_str: ;# write shell32.dll to [ebp-0x50]
+  xor eax, eax  ;# NULL EAX
+  xor ecx, ecx  ;# NULL ECX
+  mov eax, [ebp-0x50] ;# Load the address to write to into EAX
+  mov ecx, 0x006c6c64 ;# Move the part "lld." of the string "shell32.dll" to ECX
+  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
+  mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
+  mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
+  mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
+  mov [eax+0x08], ecx ;# Write the part "ehs" of the string "shell32.dll" to memory
+```
+
+To do the same, but escape the NULL byte:
+
+```bash
+$ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]" --null-free
+write_str: ;# write shell32.dll to [ebp-0x50]
+  xor eax, eax  ;# NULL EAX
+  xor ecx, ecx  ;# NULL ECX
+  mov eax, [ebp-0x50] ;# Load the address to write to into EAX
+  mov ecx, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to ECX to avoid NULL bytes
+  neg ecx ;# Negate ECX to get the original value
+  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
+  mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
+  mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
+  mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
+  mov [eax+0x08], ecx ;# Write the part "ehs" of the string "shell32.dll" to memory
 ```
 
 Calculate a hash of the given input string:

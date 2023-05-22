@@ -4,51 +4,67 @@ import binascii
 
 import sys
 
-
 module_path = os.path.dirname(__file__)
 sys.path.append(module_path)
 import numpy
 
+from argparse import ArgumentParser
 
 
 def get_arguments():
-    from argparse import ArgumentParser
     parser = ArgumentParser(description="Generate assembly instructions for various purposes")
-    parser.add_argument('--push-for-ascii',
-                        dest='push_for_ascii',
-                        action='store_true',
-                        help='Generate push instructions for ASCII string')
-    parser.add_argument('--ascii-string',
-                        dest='ascii_string',
-                        type=str,
-                        help='Specify the ASCII string to convert to the HEX format for putting this onto the stack')
-    parser.add_argument('--load-library',
-                        dest='load_library',
-                        action='store_true',
-                        help='Generate instructions for loading a DLL')
-    parser.add_argument('--load-library-addr',
-                        dest='load_library_addr',
-                        type=str,
-                        help='Specify the absolute address in HEX or a relative offset; '
-                             'e.g., --load-library-addr "[ebp+0x14]" or --load-library-addr "0x51233345"')
-    parser.add_argument('--load-library-dll-name',
-                        dest='load_library_dll_name',
-                        type=str,
-                        help='Specify the DLL name to load')
-    parser.add_argument('--null-free',
-                        dest='null_free',
-                        action='store_true',
-                        help='Avoid NULL bytes in the generated shellcode')
-    parser.add_argument('--hash',
-                        dest='hash',
-                        type=str,
-                        help='Compute a hash of the input string. '
-                             'Use --the hash-alg argument to see the corresponding algorithm on assembly.')
-    parser.add_argument('--hash-alg',
-                        dest='hash_alg',
-                        action='store_true',
-                        help='Print out the hashing algorithm used to hash the value passed with the --hash flag.')
+
+    commands = parser.add_argument_group('commands')
+    commands.add_argument('--push-for-ascii',
+                          dest='push_for_ascii',
+                          action='store_true',
+                          help='Generate push instructions for ASCII string')
+    commands.add_argument('--load-library',
+                          dest='load_library',
+                          action='store_true',
+                          help='Generate instructions for loading a DLL')
+    commands.add_argument('--null-free',
+                          dest='null_free',
+                          action='store_true',
+                          help='Avoid NULL bytes in the generated shellcode')
+    commands.add_argument('--hash',
+                          dest='hash',
+                          type=str,
+                          help='Compute a hash of the input string. '
+                               'Use --hash-alg argument to see the corresponding algorithm on assembly.')
+    commands.add_argument('--hash-alg',
+                          dest='hash_alg',
+                          action='store_true',
+                          help='Print out the hashing algorithm used to hash the value passed with the --hash flag.')
+    commands.add_argument('--write',
+                          dest='write',
+                          action='store_true',
+                          help='Generate instructions for writing an ASCII string to memory')
+
+    arguments = parser.add_argument_group('arguments')
+    arguments.add_argument('--ascii-string',
+                           dest='ascii_string',
+                           type=str,
+                           help='Specify the ASCII string to convert to the HEX format '
+                                'for putting this onto the stack with `--push-for-ascii` command '
+                                'or to write to memory with `--write` command')
+    arguments.add_argument('--load-library-addr',
+                           dest='load_library_addr',
+                           type=str,
+                           help='Specify the absolute address in HEX or a relative offset; '
+                                'e.g., --load-library-addr "[ebp+0x14]" or --load-library-addr "0x51233345"')
+    arguments.add_argument('--load-library-dll-name',
+                           dest='load_library_dll_name',
+                           type=str,
+                           help='Specify the DLL name to load')
+    arguments.add_argument('--write-addr',
+                           dest='write_addr',
+                           type=str,
+                           help='Specify the address to write to in HEX or a relative offset; '
+                                'e.g., --write-addr "[ebp-0x50]" or --write-addr "0x51233345"')
+
     return parser.parse_args()
+
 
 def print_hash_alg():
     print("""
@@ -66,6 +82,7 @@ compute_hash_again:
   jmp compute_hash_again       ;# next iteration
 
 compute_hash_finished:""")
+
 
 def ror_str(byte, count):
     """
@@ -87,6 +104,7 @@ def compute_hash(function_name):
         ror_count += 1
     print(f"Hash: {hex(edx)}")
 
+
 def negate_hex(hex_value):
     # Negate the hexadecimal value
     negated_value = hex((0xFFFFFFFF - int(hex_value, 16) + 1) & 0xFFFFFFFF)
@@ -95,7 +113,7 @@ def negate_hex(hex_value):
 
 def str_to_hex_little_endian_push(s, null_free=False):
     hex_str = binascii.hexlify(s.encode('utf-8')).decode('utf-8')
-    hex_str = ''.join(reversed([hex_str[i:i+2] for i in range(0, len(hex_str), 2)]))
+    hex_str = ''.join(reversed([hex_str[i:i + 2] for i in range(0, len(hex_str), 2)]))
     if len(hex_str) % 8 != 0:
         hex_str = '0' * (8 - len(hex_str) % 8) + hex_str
     result = os.linesep.join([hex_str[i:i + 8] for i in range(0, len(hex_str), 8)])
@@ -126,6 +144,40 @@ def generate_load_library(dll_name: str, load_library_func_addr: str, null_free=
     print(f"  call dword ptr {load_library_func_addr} ;# Call LoadLibraryA")
 
 
+def write_to_memory(s: str, write_addr: str, null_free=False):
+    hex_str = binascii.hexlify(s.encode('utf-8')).decode('utf-8')
+    hex_str = ''.join(reversed([hex_str[i:i + 2] for i in range(0, len(hex_str), 2)]))
+    if len(hex_str) % 8 != 0:
+        hex_str = '0' * (8 - len(hex_str) % 8) + hex_str
+    result = os.linesep.join([hex_str[i:i + 8] for i in range(0, len(hex_str), 8)])
+    result = [f"mov ecx, 0x{h}" for h in result.split(os.linesep)]
+
+    print(f"write_str: ;# write {s} to {write_addr}")
+    print(f"  xor eax, eax  ;# NULL EAX")
+    print(f"  xor ecx, ecx  ;# NULL ECX")
+    print(f"  mov eax, {write_addr} ;# Load the address to write to into EAX")
+    for index, h in enumerate(result):
+        part = s[::-1][index * 4: index * 4 + 4]
+        if null_free:
+            hex_value = h.split(", ")[1]  # Extract the hexadecimal value from the instruction string
+            for i in range(2, len(hex_value), 2):
+                if hex_value[i:i + 2] == '00':
+                    negated_value = negate_hex(
+                        hex_value[2:])  # Pass only the hexadecimal value to the negate_hex function
+                    print(
+                        f"  mov ecx, {negated_value} ;# Move the negated value of the part \"{part}\" of the string \"{s}\" to ECX to avoid NULL bytes")
+                    print("  neg ecx ;# Negate ECX to get the original value")
+                    break
+            else:
+                print(f"  {h} ;# Move the part \"{part}\" of the string \"{s}\" to ECX")
+        else:
+            print(f"  {h} ;# Move the part \"{part}\" of the string \"{s}\" to ECX")
+        write_offset = f"eax+0x{index * 4:02x}"
+        if write_offset == 'eax+0x00':
+            write_offset = 'eax'
+        print(f"  mov [{write_offset}], ecx ;# Write the part \"{part}\" of the string \"{s}\" to memory")
+
+
 def main():
     options = get_arguments()
     if options.hash_alg:
@@ -142,9 +194,15 @@ def main():
         if not options.load_library_dll_name or not options.load_library_addr:
             print("Error: --load-library-dll-name and --load-library-addr are required when --load-library is given.")
             sys.exit(1)
-        generate_load_library(dll_name=options.load_library_dll_name, load_library_func_addr=options.load_library_addr, null_free=options.null_free)
+        generate_load_library(dll_name=options.load_library_dll_name, load_library_func_addr=options.load_library_addr,
+                              null_free=options.null_free)
+    elif options.write:
+        if not options.ascii_string or not options.write_addr:
+            print("Error: --ascii-string and --write-addr are required when --write is given.")
+            sys.exit(1)
+        write_to_memory(s=options.ascii_string, write_addr=options.write_addr, null_free=options.null_free)
     else:
-        print("Error: Either --push-for-ascii or --load-library must be given.")
+        print("Error: Either --push-for-ascii, --write or --load-library must be given.")
         sys.exit(1)
 
 
