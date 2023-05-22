@@ -51,6 +51,7 @@ push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stac
 To generate push instructions for an ASCII string and escape the NULL bytes by using the negate approach:
 
 ```bash
+shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll --null-free
 mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
 neg eax ;# Negate EAX to get the original value
 push eax ;# Push EAX onto the stack
