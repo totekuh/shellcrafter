@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-version = "1.0.12"
+version = "1.0.13"
 
 from setuptools import setup, find_packages
 
