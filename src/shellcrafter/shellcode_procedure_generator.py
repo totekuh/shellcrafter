@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 import os
 import binascii
+
 import sys
+
+
+module_path = os.path.dirname(__file__)
+sys.path.append(module_path)
 import numpy
 
 
