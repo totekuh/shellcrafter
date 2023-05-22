@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-version = "1.0.5"
+version = "1.0.8"
 
 from setuptools import setup, find_packages
 
@@ -12,6 +12,7 @@ setup(
     version=version,
     description="A package containing scripts for developing and generating shellcode",
     long_description=long_description,
+    long_description_content_type='text/markdown',  # Add this line
     author="totekuh",
     author_email="totekuh@protonmail.com",
     packages=find_packages(where="src"),
@@ -19,9 +20,8 @@ setup(
     entry_points={
         "console_scripts": [
             "keyst-api=shellcrafter.keyst_api:main",
-            "compute-hashes-from-function-name=shellcrafter.ror_hash:main",
             "find-gadgets=shellcrafter.find_gadgets:main",
-            "ascii-to-push=shellcrafter.ascii_hex_stack_push_converter:main",
+            "shellcode-procedure-generator=shellcrafter.shellcode_procedure_generator:main",
         ],
     },
     url='https://github.com/totekuh/shellcrafter',  # Optional
