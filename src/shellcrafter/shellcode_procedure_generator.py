@@ -102,6 +102,7 @@ def str_to_hex_little_endian_push(s, null_free=False):
             for i in range(5, len(h), 2):
                 if h[i:i + 2] == '00':
                     negated_value = negate_hex(h[5:])
+                    print("xor eax, eax  ;# NULL EAX")
                     print(
                         f"mov eax, {negated_value} ;# Move the negated value of the part \"{part}\" of the string \"{s}\" to EAX to avoid NULL bytes")
                     print("neg eax ;# Negate EAX to get the original value")
