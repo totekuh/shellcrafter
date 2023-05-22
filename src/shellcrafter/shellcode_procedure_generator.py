@@ -153,9 +153,11 @@ def write_to_memory(s: str, write_addr: str, null_free=False):
     result = [f"mov ecx, 0x{h}" for h in result.split(os.linesep)]
 
     print(f"write_str: ;# write {s} to {write_addr}")
+    print(f"  xor eax, eax  ;# NULL EAX")
+    print(f"  xor ecx, ecx  ;# NULL ECX")
+    print(f"  mov eax, {write_addr} ;# Load the address to write to into EAX")
     for index, h in enumerate(result):
         part = s[::-1][index * 4: index * 4 + 4]
-        print(f"  mov eax, {write_addr} ;# Load the address to write to into EAX")
         if null_free:
             hex_value = h.split(", ")[1]  # Extract the hexadecimal value from the instruction string
             for i in range(2, len(hex_value), 2):
@@ -170,7 +172,10 @@ def write_to_memory(s: str, write_addr: str, null_free=False):
                 print(f"  {h} ;# Move the part \"{part}\" of the string \"{s}\" to ECX")
         else:
             print(f"  {h} ;# Move the part \"{part}\" of the string \"{s}\" to ECX")
-        print(f"  mov [eax+0x{index * 4:02x}], ecx ;# Write the part \"{part}\" of the string \"{s}\" to memory")
+        write_offset = f"eax+0x{index * 4:02x}"
+        if write_offset == 'eax+0x00':
+            write_offset = 'eax'
+        print(f"  mov [{write_offset}], ecx ;# Write the part \"{part}\" of the string \"{s}\" to memory")
 
 
 def main():

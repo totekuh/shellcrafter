@@ -96,10 +96,12 @@ To generate instructions for writing an ASCII string to memory:
 
 ```bash
 $ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]"
-write_str:  ;# write the 'shell32.dll' to the memory
+write_str: ;# write shell32.dll to [ebp-0x50]
+  xor eax, eax  ;# NULL EAX
+  xor ecx, ecx  ;# NULL ECX
   mov eax, [ebp-0x50] ;# Load the address to write to into EAX
   mov ecx, 0x006c6c64 ;# Move the part "lld." of the string "shell32.dll" to ECX
-  mov [eax+0x00], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
+  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
   mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
   mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
   mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
@@ -110,16 +112,17 @@ To do the same, but escape the NULL byte:
 
 ```bash
 $ shellcode-procedure-generator --write --ascii-string "shell32.dll" --write-addr "[ebp-0x50]" --null-free
-write_str:  ;# write the 'shell32.dll' to the memory
+write_str: ;# write shell32.dll to [ebp-0x50]
+  xor eax, eax  ;# NULL EAX
+  xor ecx, ecx  ;# NULL ECX
   mov eax, [ebp-0x50] ;# Load the address to write to into EAX
   mov ecx, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to ECX to avoid NULL bytes
   neg ecx ;# Negate ECX to get the original value
-  mov [eax+0x00], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
+  mov [eax], ecx ;# Write the part "lld." of the string "shell32.dll" to memory
   mov ecx, 0x2e32336c ;# Move the part "23ll" of the string "shell32.dll" to ECX
   mov [eax+0x04], ecx ;# Write the part "23ll" of the string "shell32.dll" to memory
   mov ecx, 0x6c656873 ;# Move the part "ehs" of the string "shell32.dll" to ECX
   mov [eax+0x08], ecx ;# Write the part "ehs" of the string "shell32.dll" to memory
-
 ```
 
 Calculate a hash of the given input string:

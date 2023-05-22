@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-version = "1.0.14"
+version = "1.0.15"
 
 from setuptools import setup, find_packages
 
