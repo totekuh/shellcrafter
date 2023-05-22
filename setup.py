@@ -12,6 +12,7 @@ setup(
     version=version,
     description="A package containing scripts for developing and generating shellcode",
     long_description=long_description,
+    long_description_content_type='text/markdown',  # Add this line
     author="totekuh",
     author_email="totekuh@protonmail.com",
     packages=find_packages(where="src"),
