@@ -19,7 +19,6 @@ setup(
     entry_points={
         "console_scripts": [
             "keyst-api=shellcrafter.keyst_api:main",
-            "compute-hashes-from-function-name=shellcrafter.ror_hash:main",
             "find-gadgets=shellcrafter.find_gadgets:main",
             "shellcode-procedure-generator=shellcrafter.shellcode_procedure_generator:main",
         ],

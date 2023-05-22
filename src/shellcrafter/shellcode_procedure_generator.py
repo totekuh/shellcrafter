@@ -2,11 +2,13 @@
 import os
 import binascii
 import sys
+import numpy
+
 
 
 def get_arguments():
     from argparse import ArgumentParser
-    parser = ArgumentParser()
+    parser = ArgumentParser(description="Generate assembly instructions for various purposes")
     parser.add_argument('--push-for-ascii',
                         dest='push_for_ascii',
                         action='store_true',
@@ -32,8 +34,53 @@ def get_arguments():
                         dest='null_free',
                         action='store_true',
                         help='Avoid NULL bytes in the generated shellcode')
+    parser.add_argument('--hash',
+                        dest='hash',
+                        type=str,
+                        help='Compute a hash of the input string. '
+                             'Use --the hash-alg argument to see the corresponding algorithm on assembly.')
+    parser.add_argument('--hash-alg',
+                        dest='hash_alg',
+                        action='store_true',
+                        help='Print out the hashing algorithm used to hash the value passed with the --hash flag.')
     return parser.parse_args()
 
+def print_hash_alg():
+    print("""
+compute_hash:
+  xor eax, eax                 ;# NULL EAX
+  cdq                          ;# NULL EDX
+  cld                          ;# clear direction (clears the direction flag DF in the EFLAGS register)
+
+compute_hash_again:
+  lodsb                        ;# load the next byte from ESI into AL
+  test al, al                  ;# check if AL contains the NULL terminator
+  jz compute_hash_finished     ;# if the ZF is set, we've hit the NULL terminator
+  ror edx, 0x0d                ;# rotate EDX 13 bits to the right
+  add edx, eax                 ;# add the new hashed byte to the accumulator
+  jmp compute_hash_again       ;# next iteration
+
+compute_hash_finished:""")
+
+def ror_str(byte, count):
+    """
+    Rotate the given byte right by the specified count.
+    """
+    binb = numpy.base_repr(byte, 2).zfill(32)
+    for _ in range(count):
+        binb = binb[-1] + binb[0:-1]
+    return int(binb, 2)
+
+
+def compute_hash(function_name):
+    edx = 0x00
+    ror_count = 0
+    for eax in function_name:
+        edx = edx + ord(eax)
+        if ror_count < len(function_name) - 1:
+            edx = ror_str(edx, 0xd)
+        ror_count += 1
+    print(f"Hash: {hex(edx)}")
 
 def negate_hex(hex_value):
     # Negate the hexadecimal value
@@ -74,7 +121,11 @@ def generate_load_library(dll_name: str, load_library_addr: str, null_free=False
 
 def main():
     options = get_arguments()
-    if options.push_for_ascii:
+    if options.hash_alg:
+        print_hash_alg()
+    elif options.hash:
+        compute_hash(options.hash)
+    elif options.push_for_ascii:
         if not options.ascii_string:
             print("Error: --ascii-string is required when --push-for-ascii is given.")
             sys.exit(1)
