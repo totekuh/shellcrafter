@@ -88,9 +88,8 @@ call dword ptr [ebp+0x10] ;# Call LoadLibraryA
 Calculate a hash of the given input string:
 
 ```bash
-shellcode-procedure-generator --hash LoadLibraryA 
+shellcode-procedure-generator --hash LoadLibraryA
 Hash: 0xec0e4e8e
-
 ```
 
 Print out the hashing algorithm used to generate the hash value:
