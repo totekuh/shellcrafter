@@ -9,13 +9,13 @@ It provides a collection of utilities for working with shellcode in various ways
 To install Shellcrafter, use pip:
 
 ```bash
-pip3 install shellcrafter
+$ pip3 install shellcrafter
 ```
 
 Or clone this repository and run:
 
 ```bash
-pip3 install .
+$ pip3 install .
 ```
 
 
@@ -30,9 +30,9 @@ Shellcrafter provides the following command-line utilities:
 To get help on how to use each utility, run the corresponding command with the `-h` or `--help` flag:
 
 ```bash
-keyst-api --help
-shellcode-procedure-generator --help
-find-gadgets --help
+$ keyst-api --help
+$ shellcode-procedure-generator --help
+$ find-gadgets --help
 ```
 
 ## Examples
@@ -95,14 +95,14 @@ load_lib:  ;# load the shell32.dll DLL
 Calculate a hash of the given input string:
 
 ```bash
-shellcode-procedure-generator --hash LoadLibraryA
+$ shellcode-procedure-generator --hash LoadLibraryA
 Hash: 0xec0e4e8e
 ```
 
 Print out the hashing algorithm used to generate the hash value:
 
 ```bash
-shellcode-procedure-generator --hash-alg                                                                                     
+$ shellcode-procedure-generator --hash-alg                                                                                     
 
 compute_hash:
   xor eax, eax                 ;# NULL EAX
