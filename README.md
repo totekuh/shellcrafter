@@ -42,47 +42,54 @@ Here are some examples of how to use the shellcode-procedure-generator tool:
 To generate push instructions for an ASCII string:
 
 ```bash
-shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll
-push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
-push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+$ shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll
+push_str:  ;# push the 'shell32.dll' onto the stack
+  push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
+  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
+  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+
 ```
 
 To generate push instructions for an ASCII string and escape the NULL bytes by using the negate approach:
 
 ```bash
-shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll --null-free
-mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
-neg eax ;# Negate EAX to get the original value
-push eax ;# Push EAX onto the stack
-push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+$ shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll --null-free
+push_str:  ;# push the 'shell32.dll' onto the stack
+  mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
+  neg eax ;# Negate EAX to get the original value
+  push eax ;# Push EAX onto the stack
+  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
+  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+
 ```
 
 To generate instructions for loading a DLL:
 
 ```bash
-shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll
-xor eax, eax ;# NULL EAX
-push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
-push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
-call dword ptr [ebp+0x10] ;# Call LoadLibraryA
+$ shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll
+load_lib:  ;# load the shell32.dll DLL
+  xor eax, eax ;# NULL EAX
+  push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
+  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
+  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
+  call dword ptr [ebp+0x10] ;# Call LoadLibraryA
+
 ```
 
 To do the same, but escape the NULL byte:
 
 ```bash
-shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll --null-free
-xor eax, eax ;# NULL EAX
-mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
-neg eax ;# Negate EAX to get the original value
-push eax ;# Push EAX onto the stack
-push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
-call dword ptr [ebp+0x10] ;# Call LoadLibraryA
+$ shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll --null-free
+load_lib:  ;# load the shell32.dll DLL
+  xor eax, eax ;# NULL EAX
+  mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
+  neg eax ;# Negate EAX to get the original value
+  push eax ;# Push EAX onto the stack
+  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
+  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
+  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
+  call dword ptr [ebp+0x10] ;# Call LoadLibraryA
 ```
 
 Calculate a hash of the given input string:
