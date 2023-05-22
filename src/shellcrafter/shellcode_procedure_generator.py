@@ -151,13 +151,14 @@ def write_to_memory(s: str, write_addr: str, null_free=False):
         hex_str = '0' * (8 - len(hex_str) % 8) + hex_str
     result = os.linesep.join([hex_str[i:i + 8] for i in range(0, len(hex_str), 8)])
     result = [f"mov ecx, 0x{h}" for h in result.split(os.linesep)]
+    result.reverse()  # Reverse the order of the instructions
 
     print(f"write_str: ;# write {s} to {write_addr}")
     print(f"  xor eax, eax  ;# NULL EAX")
     print(f"  xor ecx, ecx  ;# NULL ECX")
-    print(f"  mov eax, {write_addr} ;# Load the address to write to into EAX")
+    print(f"  lea eax, {write_addr} ;# Load the address to write to into EAX")
     for index, h in enumerate(result):
-        part = s[::-1][index * 4: index * 4 + 4]
+        part = s[index * 4: index * 4 + 4]
         if null_free:
             hex_value = h.split(", ")[1]  # Extract the hexadecimal value from the instruction string
             for i in range(2, len(hex_value), 2):
