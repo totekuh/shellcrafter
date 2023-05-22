@@ -50,7 +50,7 @@ def str_to_hex_little_endian_push(s, null_free=False):
     result = [f"push 0x{h}" for h in result.split(os.linesep)]
 
     for index, h in enumerate(result):
-        part = s[index * 4: index * 4 + 4]
+        part = s[::-1][index * 4: index * 4 + 4]
         if null_free:
             for i in range(5, len(h), 2):
                 if h[i:i + 2] == '00':
