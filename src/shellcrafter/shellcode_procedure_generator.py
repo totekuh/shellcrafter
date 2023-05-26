@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import binascii
+import pprint
 
 import sys
 
@@ -40,6 +41,10 @@ def get_arguments():
                           dest='write',
                           action='store_true',
                           help='Generate instructions for writing an ASCII string to memory')
+    commands.add_argument("--print-data-types",
+                          dest="print_data_types",
+                          action="store_true",
+                          help="Print out information about commonly used Win32 data types")
 
     arguments = parser.add_argument_group('arguments')
     arguments.add_argument('--ascii-string',
@@ -65,6 +70,139 @@ def get_arguments():
 
     return parser.parse_args()
 
+# Define data types
+data_types = {
+    "LPCSTR": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to a Constant String. Used for C-style null-terminated strings."
+    },
+    "LPVOID": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to Void. Can point to any type of data."
+    },
+    "LPBOOL": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to BOOL. Used for passing boolean values by reference."
+    },
+    "DWORD": {
+        "type": "integer",
+        "size": 4,  # 32-bit integer size
+        "description": "Double Word. A 32-bit unsigned integer."
+    },
+    "LPPROGRESS_ROUTINE": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to PROGRESS_ROUTINE. Used for callback functions."
+    },
+    "BOOL": {
+        "type": "integer",
+        "size": 4,  # 32-bit integer size
+        "description": "Boolean. Used for true/false values."
+    },
+    "BYTE": {
+        "type": "integer",
+        "size": 1,  # 8-bit integer size
+        "description": "Byte. An 8-bit unsigned integer."
+    },
+    "WORD": {
+        "type": "integer",
+        "size": 2,  # 16-bit integer size
+        "description": "Word. A 16-bit unsigned integer."
+    },
+    "LONG": {
+        "type": "integer",
+        "size": 4,  # 32-bit integer size
+        "description": "Long. A 32-bit signed integer."
+    },
+    "WCHAR": {
+        "type": "integer",
+        "size": 2,  # 16-bit integer size
+        "description": "Wide Character. Used for Unicode characters."
+    },
+    "LPWSTR": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to a Wide String. Used for Unicode C-style null-terminated strings."
+    },
+    "HANDLE": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle. Used as a reference to a system resource."
+    },
+    "HWND": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Window. Used as a reference to a window object."
+    },
+    "HINSTANCE": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to an Instance. Used as a reference to an application instance."
+    },
+    "UINT": {
+        "type": "integer",
+        "size": 4,  # 32-bit integer size
+        "description": "Unsigned Integer. A 32-bit unsigned integer."
+    },
+    "SHORT": {
+        "type": "integer",
+        "size": 2,  # 16-bit integer size
+        "description": "Short. A 16-bit signed integer."
+    },
+    "FLOAT": {
+        "type": "float",
+        "size": 4,  # 32-bit float size
+        "description": "Float. A 32-bit floating point number."
+    },
+    "DOUBLE": {
+        "type": "float",
+        "size": 8,  # 64-bit double size
+        "description": "Double. A 64-bit floating point number."
+    },
+    "LPDWORD": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to DWORD. Used for passing DWORD values by reference."
+    },
+    "LPLONG": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Long Pointer to LONG. Used for passing LONG values by reference."
+    },
+    "HDC": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Device Context. Used as a reference to a device context."
+    },
+    "HBITMAP": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Bitmap. Used as a reference to a bitmap object."
+    },
+    "HBRUSH": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Brush. Used as a reference to a brush object."
+    },
+    "HCURSOR": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Cursor. Used as a reference to a cursor object."
+    },
+    "HICON": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to an Icon. Used as a reference to an icon object."
+    },
+    "HMENU": {
+        "type": "pointer",
+        "size": 4,  # 32-bit pointer size
+        "description": "Handle to a Menu. Used as a reference to a menu object."
+    }
+}
 
 def print_hash_alg():
     print("""
@@ -139,6 +277,7 @@ def str_to_hex_little_endian_push(s, null_free=False):
 def generate_load_library(dll_name: str, load_library_func_addr: str, null_free=False):
     print(f"load_lib:  ;# load the {dll_name} DLL")
     print("  xor eax, eax ;# NULL EAX")
+    print("  push eax ;# Push NULL terminator for the string")
     str_to_hex_little_endian_push(dll_name, null_free=null_free)
     print("  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack")
     print(f"  call dword ptr {load_library_func_addr} ;# Call LoadLibraryA")
@@ -183,6 +322,8 @@ def main():
     options = get_arguments()
     if options.hash_alg:
         print_hash_alg()
+    elif options.print_data_types:
+        pprint.pprint(data_types, indent=4)
     elif options.hash:
         compute_hash(options.hash)
     elif options.push_for_ascii:
