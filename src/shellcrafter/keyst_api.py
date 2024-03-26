@@ -3,10 +3,19 @@ import ctypes
 import os
 from struct import pack
 from termcolor import colored
+import sys
 
 from keystone import *
 
 DEFAULT_VAR_NAME = "shellcode"
+
+OUTPUT_FORMAT_PYTHON = 'python'
+OUTPUT_FORMAT_C_ARRAY = 'c-array'
+OUTPUT_FORMAT_BIN = 'bin'
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 def get_arguments():
@@ -44,7 +53,7 @@ def get_arguments():
     parser.add_argument('--interval',
                         dest='interval',
                         required=False,
-                        default=48,
+                        default=24,
                         choices=[0, 12, 24, 48, 96, 192],
                         type=int,
                         help="Specify the number of opcodes per line while printing the shellcode. "
@@ -58,6 +67,12 @@ def get_arguments():
                              'or if the script should wait until the user attaches a debugger to the process. '
                              "By default the script doesn't wait for the user to hit any key "
                              "before executing the shellcode. ")
+    parser.add_argument('--output-format',
+                        dest='output_format',
+                        required=False,
+                        default=OUTPUT_FORMAT_PYTHON,
+                        choices=[OUTPUT_FORMAT_PYTHON, OUTPUT_FORMAT_C_ARRAY, OUTPUT_FORMAT_BIN],
+                        help="Specify the output format of the shellcode: 'python', 'c-array', or 'bin'. Default is 'python'.")
     options = parser.parse_args()
     if options.instructions and options.instructions_file:
         parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
@@ -87,10 +102,10 @@ def run_shellcode(encoding: list, interactive: bool):
     ctypes.windll.kernel32.RtlMoveMemory(ctypes.c_int(ptr),
                                          buf,
                                          ctypes.c_int(len(shellcode)))
-    print(f"[*] Shellcode located at address {hex(ptr)}")
+    eprint(f"[*] Shellcode located at address {hex(ptr)}")
     if interactive:
         input("[!] Press Enter to execute shellcode")
-    print(f"[*] Executing shellcode...")
+    eprint(f"[*] Executing shellcode...")
     ht = ctypes.windll.kernel32.CreateThread(ctypes.c_int(0),
                                              ctypes.c_int(0),
                                              ctypes.c_int(ptr),
@@ -100,41 +115,84 @@ def run_shellcode(encoding: list, interactive: bool):
     ctypes.windll.kernel32.WaitForSingleObject(ctypes.c_int(ht), ctypes.c_int(-1))
 
 
-def print_shellcode(encoding: list, var_name: str, interval: int):
-    # inserts new lines into the shellcode printed to make it look pretty
-    def insert_newlines(string: str, var_name: str, interval: int):
-        result = f'{var_name} += b"'
-        for i, c in enumerate(string):
-            result += c
-            if (i + 1) % interval == 0:
-                result += f'"{os.linesep}{var_name} += b"'
-        result = result + '"'
-        return result
+def format_shellcode(shellcode_bytes: bytearray, interval: int):
+    # Function to generate opcode string and detect null bytes
+    opcodes = "".join(f"\\x{byte:02x}" for byte in shellcode_bytes)
+    formatted_opcodes = ""
+    null_byte_detected = "\\x00" in opcodes
 
-    opcodes = ""
-    opcodes_len = 0
-    for dec in encoding:
-        opcodes_len += 1
-        opcodes += "\\x{0:02x}".format(int(dec)).rstrip("\n")
-    print(f"Assembled shellcode ({opcodes_len} bytes):")
-    instructions = ""
-    for i, instr in enumerate(opcodes):
-        instructions += instr
-    if interval:
-        formatted_shellcode = f'{var_name} = b""'
-        formatted_shellcode += os.linesep
-        formatted_shellcode += insert_newlines(instructions, var_name, interval)
+    if interval > 0:
+        # Splitting opcodes with the specified interval
+        for i in range(0, len(opcodes), interval):
+            end = min(i + interval, len(opcodes))
+            formatted_opcodes += opcodes[i:end] + "\n"
     else:
-        formatted_shellcode = f'{var_name} = b"{instructions}"'
+        formatted_opcodes = opcodes
 
-    # check for bad characters
-    if "\\x00" in instructions:
-        formatted_shellcode = formatted_shellcode.replace("\\x00", colored("\\x00", 'red'))
+    return formatted_opcodes, null_byte_detected
 
-    print(formatted_shellcode)
-    if "\\x00" in instructions:
-        print()
-        print(f"[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
+
+def print_shellcode(shellcode_assembled: list, var_name: str, interval: int, output_format: str):
+    shellcode_bytes = bytearray(shellcode_assembled)
+    shellcode_length = len(shellcode_bytes)
+    formatted_opcodes, null_byte_detected = format_shellcode(shellcode_bytes, interval * 4)
+
+    if output_format == OUTPUT_FORMAT_PYTHON:
+        print_python_shellcode(formatted_opcodes=formatted_opcodes,
+                               null_byte_detected=null_byte_detected,
+                               var_name=var_name,
+                               shellcode_length=shellcode_length)
+    elif output_format == OUTPUT_FORMAT_C_ARRAY:
+        print_c_array(formatted_opcodes=formatted_opcodes,
+                      null_byte_detected=null_byte_detected,
+                      var_name=var_name,
+                               shellcode_length=shellcode_length, interval=interval)
+    elif output_format == OUTPUT_FORMAT_BIN:
+        os.write(1, shellcode_bytes)
+
+
+def print_python_shellcode(formatted_opcodes: str, null_byte_detected: bool, var_name: str, shellcode_length: int):
+    # Python shellcode printing logic, now using formatted_opcodes
+    shellcode = f'{var_name} = b""\n'
+    for line in formatted_opcodes.split("\n"):
+        if line:
+            shellcode += f'{var_name} += b"{line}"\n'
+    shellcode += f"{var_name}_len = {shellcode_length}"
+
+    if null_byte_detected:
+        shellcode = shellcode.replace("\\x00", colored("\\x00", 'red'))
+        print(shellcode)
+        print("\n[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
+    else:
+        print(shellcode)
+
+def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: str, shellcode_length: int, interval: int):
+    # Ensure each byte is properly formatted as 0xXX
+    opcodes = formatted_opcodes.replace("\\x", "0x")
+
+    if null_byte_detected:
+        # Highlight potential issues with null bytes
+        opcodes = opcodes.replace("0x00", "0x00 /* null byte */")
+
+    # Split the opcodes string into individual opcodes
+    opcode_list = opcodes.split("0x")[1:]  # Remove the first empty string from split
+    opcode_list = [f"0x{opcode}" for opcode in opcode_list if opcode]  # Re-add the 0x prefix
+
+    # Determine the number of opcodes per line
+    opcodes_per_line = interval // 4 if interval > 0 else len(opcode_list)
+
+    print(f"unsigned char {var_name}[] = {{")
+    for i in range(0, len(opcode_list), opcodes_per_line):
+        # Join a chunk of opcodes for the current line
+        line = ', '.join(opcode_list[i:i+opcodes_per_line])
+        # Check if this is the last line to avoid adding a comma at the end
+        if i + opcodes_per_line < len(opcode_list):
+            print(f"  {line.strip()},")
+        else:
+            print(f"  {line}")
+    print("};")
+    print(f"unsigned int {var_name}_len = {shellcode_length};")
+
 
 
 def main():
@@ -144,19 +202,18 @@ def main():
     ks = Ks(KS_ARCH_X86, KS_MODE_32)
 
     try:
-        encoding, count = ks.asm(options.instructions)
+        shellcode_assembled, count = ks.asm(options.instructions)
     except KsError as ks_error:
-        print(f"Shellcode compilation failed: {ks_error}")
+        eprint(f"Shellcode compilation failed: {ks_error}")
         exit(1)
-    print(f"[+] {count} instructions have been encoded")
+    eprint(f"[+] {count} instructions have been encoded")
 
     if options.run:
-        run_shellcode(encoding=encoding,
+        run_shellcode(encoding=shellcode_assembled,
                       interactive=options.interactive)
     else:
-        print_shellcode(encoding=encoding,
-                        var_name=options.var_name,
-                        interval=options.interval)
+        print_shellcode(shellcode_assembled=shellcode_assembled, var_name=options.var_name, interval=options.interval,
+                        output_format=options.output_format)
 
 
 if __name__ == "__main__":
