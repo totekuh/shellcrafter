@@ -97,31 +97,51 @@ def get_arguments():
     return options
 
 
-def run_shellcode(encoding: list, interactive: bool):
-    sh = b""
-    for e in encoding:
-        sh += pack("B", e)
+def run_shellcode(encoding: list, interactive: bool, arch: str):
+    sh = b"".join(pack("B", e) for e in encoding)
     shellcode = bytearray(sh)
-    ptr = ctypes.windll.kernel32.VirtualAlloc(ctypes.c_int(0),
-                                              ctypes.c_int(len(shellcode)),
-                                              ctypes.c_int(0x3000),
-                                              ctypes.c_int(0x40))
+
+    # Setting restype and argtypes for VirtualAlloc and CreateThread
+    VirtualAlloc = ctypes.windll.kernel32.VirtualAlloc
+    VirtualAlloc.restype = ctypes.c_void_p
+    VirtualAlloc.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_ulong, ctypes.c_ulong]
+
+    RtlMoveMemory = ctypes.windll.kernel32.RtlMoveMemory
+    RtlMoveMemory.restype = None
+    RtlMoveMemory.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
+
+    # Allocate memory for shellcode
+    ptr = VirtualAlloc(None, len(shellcode), 0x3000, 0x40)
+    if not ptr:
+        raise ValueError("Failed to allocate memory.")
+
     buf = (ctypes.c_char * len(shellcode)).from_buffer(shellcode)
-    ctypes.windll.kernel32.RtlMoveMemory(ctypes.c_int(ptr),
-                                         buf,
-                                         ctypes.c_int(len(shellcode)))
+    RtlMoveMemory(ptr, buf, len(shellcode))
+
     eprint(f"[*] Shellcode located at address {hex(ptr)}")
+
     if interactive:
         input("[!] Press Enter to execute shellcode")
-    eprint(f"[*] Executing shellcode...")
-    ht = ctypes.windll.kernel32.CreateThread(ctypes.c_int(0),
-                                             ctypes.c_int(0),
-                                             ctypes.c_int(ptr),
-                                             ctypes.c_int(0),
-                                             ctypes.c_int(0),
-                                             ctypes.pointer(ctypes.c_int(0)))
-    ctypes.windll.kernel32.WaitForSingleObject(ctypes.c_int(ht), ctypes.c_int(-1))
 
+    eprint(f"[*] Executing shellcode...")
+
+    # Adjusting for x64 architecture with CreateThread
+    if arch == 'x64':
+        # Ensure compatibility with x64 by using correct types
+        CreateThread = ctypes.windll.kernel32.CreateThread
+        CreateThread.restype = ctypes.c_void_p
+        CreateThread.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
+                                 ctypes.c_void_p]
+
+        thread_id = ctypes.c_ulonglong()  # For x64, use c_ulonglong
+    else:
+        thread_id = ctypes.c_ulong()
+
+    ht = CreateThread(None, 0, ptr, None, 0, ctypes.byref(thread_id))
+    if not ht:
+        raise ValueError("Failed to create thread.")
+
+    ctypes.windll.kernel32.WaitForSingleObject(ctypes.c_void_p(ht), -1)
 
 def format_shellcode(shellcode_bytes: bytearray, interval: int):
     # Function to generate opcode string and detect null bytes
@@ -229,7 +249,8 @@ def main():
 
     if options.run:
         run_shellcode(encoding=shellcode_assembled,
-                      interactive=options.interactive)
+                      interactive=options.interactive,
+                      arch=options.arch)
     else:
         print_shellcode(shellcode_assembled=shellcode_assembled, var_name=options.var_name, interval=options.interval,
                         output_format=options.output_format)
