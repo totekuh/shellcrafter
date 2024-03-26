@@ -73,6 +73,14 @@ def get_arguments():
                         default=OUTPUT_FORMAT_PYTHON,
                         choices=[OUTPUT_FORMAT_PYTHON, OUTPUT_FORMAT_C_ARRAY, OUTPUT_FORMAT_BIN],
                         help="Specify the output format of the shellcode: 'python', 'c-array', or 'bin'. Default is 'python'.")
+    # Add argument for architecture
+    parser.add_argument('--arch',
+                        dest='arch',
+                        required=False,
+                        default='x86',
+                        choices=['x86', 'x64'],
+                        help="Specify the architecture ('x86' or 'x64'). Default is 'x86'.")
+
     options = parser.parse_args()
     if options.instructions and options.instructions_file:
         parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
@@ -172,7 +180,7 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
 
     if null_byte_detected:
         # Highlight potential issues with null bytes
-        opcodes = opcodes.replace("0x00", "0x00 /* null byte */")
+        opcodes = opcodes.replace("0x00", colored("0x00", "red"))
 
     # Split the opcodes string into individual opcodes
     opcode_list = opcodes.split("0x")[1:]  # Remove the first empty string from split
@@ -198,8 +206,19 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
 def main():
     options = get_arguments()
 
-    # initialize the keystone engine in 32-bit mode
-    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    # Determine the architecture and mode for the Keystone engine
+    if options.arch == 'x86':
+        arch = KS_ARCH_X86
+        mode = KS_MODE_32
+    elif options.arch == 'x64':
+        arch = KS_ARCH_X86
+        mode = KS_MODE_64
+    else:
+        eprint(f"Unsupported architecture: {options.arch}")
+        sys.exit(1)
+
+    # Initialize the keystone engine with the specified architecture and mode
+    ks = Ks(arch, mode)
 
     try:
         shellcode_assembled, count = ks.asm(options.instructions)
