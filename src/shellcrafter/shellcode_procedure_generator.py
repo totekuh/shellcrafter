@@ -204,7 +204,7 @@ data_types = {
     }
 }
 
-def print_hash_alg():
+def print_hash_algorithm():
     print("""
 compute_hash:
   xor eax, eax                 ;# NULL EAX

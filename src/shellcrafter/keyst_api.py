@@ -4,77 +4,9 @@ import os
 from struct import pack
 from termcolor import colored
 
-from keystone import *
-
-DEFAULT_VAR_NAME = "shellcode"
 
 
-def get_arguments():
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description="Keystone Shellcode Generator")
-    parser.add_argument("-i",
-                        "--instructions",
-                        dest="instructions",
-                        required=False,
-                        type=str,
-                        help="Specify a set of assembly instructions to generate the shellcode")
-    parser.add_argument('-if',
-                        '--instructions-file',
-                        dest='instructions_file',
-                        required=False,
-                        type=str,
-                        help="Specify a file with assembly instructions to generate the shellcode")
-    parser.add_argument('-r',
-                        '--run',
-                        dest='run',
-                        required=False,
-                        action='store_true',
-                        help="Provide this flag to run your shellcode using the keystone engine on a Windows machine "
-                             "in the context of the python3.exe process. "
-                             "Without providing this flag the script just prints out the assembled shellcode.")
-    parser.add_argument('-vn',
-                        '--var-name',
-                        dest='var_name',
-                        required=False,
-                        default=DEFAULT_VAR_NAME,
-                        type=str,
-                        help="Specify the variable name for your shellcode to be printed with, "
-                             "so that you can easily copypaste it into your exploit. "
-                             f"Default is '{DEFAULT_VAR_NAME}'.")
-    parser.add_argument('--interval',
-                        dest='interval',
-                        required=False,
-                        default=48,
-                        choices=[0, 12, 24, 48, 96, 192],
-                        type=int,
-                        help="Specify the number of opcodes per line while printing the shellcode. "
-                             f"Default is {48}. "
-                             f"0 indicates that the shellcode should be printed as a single line.")
-    parser.add_argument('--interactive',
-                        dest='interactive',
-                        required=False,
-                        action='store_true',
-                        help='Specify if the script execute the shellcode after creating a virtual thread, '
-                             'or if the script should wait until the user attaches a debugger to the process. '
-                             "By default the script doesn't wait for the user to hit any key "
-                             "before executing the shellcode. ")
-    options = parser.parse_args()
-    if options.instructions and options.instructions_file:
-        parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
-    if not options.instructions and not options.instructions_file:
-        parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
-
-    if options.instructions_file:
-        instructions_file = options.instructions_file
-        if os.path.exists(instructions_file):
-            with open(instructions_file, 'r', encoding='utf-8', errors='ignore') as f:
-                options.instructions = f.read()
-        else:
-            parser.error(f"The given file {instructions_file} doesn't exist")
-    return options
-
-
-def run_shellcode(encoding: list, interactive: bool):
+def run_shellcode_with_virtualalloc(encoding: list, interactive: bool):
     sh = b""
     for e in encoding:
         sh += pack("B", e)
@@ -136,28 +68,3 @@ def print_shellcode(encoding: list, var_name: str, interval: int):
         print()
         print(f"[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
 
-
-def main():
-    options = get_arguments()
-
-    # initialize the keystone engine in 32-bit mode
-    ks = Ks(KS_ARCH_X86, KS_MODE_32)
-
-    try:
-        encoding, count = ks.asm(options.instructions)
-    except KsError as ks_error:
-        print(f"Shellcode compilation failed: {ks_error}")
-        exit(1)
-    print(f"[+] {count} instructions have been encoded")
-
-    if options.run:
-        run_shellcode(encoding=encoding,
-                      interactive=options.interactive)
-    else:
-        print_shellcode(encoding=encoding,
-                        var_name=options.var_name,
-                        interval=options.interval)
-
-
-if __name__ == "__main__":
-    main()
