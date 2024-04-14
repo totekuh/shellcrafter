@@ -1,101 +1,19 @@
 #!/usr/bin/env python3
 import ctypes
 import os
+import sys
 from struct import pack
 from termcolor import colored
-import sys
-
-from keystone import *
-
-DEFAULT_VAR_NAME = "shellcode"
 
 OUTPUT_FORMAT_PYTHON = 'python'
 OUTPUT_FORMAT_C_ARRAY = 'c-array'
 OUTPUT_FORMAT_BIN = 'bin'
 
+X86_ARCH = 'x86'
+X64_ARCH = 'x64'
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
-
-
-def get_arguments():
-    from argparse import ArgumentParser
-    parser = ArgumentParser(description="Keystone Shellcode Generator")
-    parser.add_argument("-i",
-                        "--instructions",
-                        dest="instructions",
-                        required=False,
-                        type=str,
-                        help="Specify a set of assembly instructions to generate the shellcode")
-    parser.add_argument('-if',
-                        '--instructions-file',
-                        dest='instructions_file',
-                        required=False,
-                        type=str,
-                        help="Specify a file with assembly instructions to generate the shellcode")
-    parser.add_argument('-r',
-                        '--run',
-                        dest='run',
-                        required=False,
-                        action='store_true',
-                        help="Provide this flag to run your shellcode using the keystone engine on a Windows machine "
-                             "in the context of the python3.exe process. "
-                             "Without providing this flag the script just prints out the assembled shellcode.")
-    parser.add_argument('-vn',
-                        '--var-name',
-                        dest='var_name',
-                        required=False,
-                        default=DEFAULT_VAR_NAME,
-                        type=str,
-                        help="Specify the variable name for your shellcode to be printed with, "
-                             "so that you can easily copypaste it into your exploit. "
-                             f"Default is '{DEFAULT_VAR_NAME}'.")
-    parser.add_argument('--interval',
-                        dest='interval',
-                        required=False,
-                        default=24,
-                        choices=[0, 12, 24, 48, 96, 192],
-                        type=int,
-                        help="Specify the number of opcodes per line while printing the shellcode. "
-                             f"Default is {48}. "
-                             f"0 indicates that the shellcode should be printed as a single line.")
-    parser.add_argument('--interactive',
-                        dest='interactive',
-                        required=False,
-                        action='store_true',
-                        help='Specify if the script execute the shellcode after creating a virtual thread, '
-                             'or if the script should wait until the user attaches a debugger to the process. '
-                             "By default the script doesn't wait for the user to hit any key "
-                             "before executing the shellcode. ")
-    parser.add_argument('--output-format',
-                        dest='output_format',
-                        required=False,
-                        default=OUTPUT_FORMAT_PYTHON,
-                        choices=[OUTPUT_FORMAT_PYTHON, OUTPUT_FORMAT_C_ARRAY, OUTPUT_FORMAT_BIN],
-                        help="Specify the output format of the shellcode: 'python', 'c-array', or 'bin'. Default is 'python'.")
-    # Add argument for architecture
-    parser.add_argument('--arch',
-                        dest='arch',
-                        required=False,
-                        default='x86',
-                        choices=['x86', 'x64'],
-                        help="Specify the architecture ('x86' or 'x64'). Default is 'x86'.")
-
-    options = parser.parse_args()
-    if options.instructions and options.instructions_file:
-        parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
-    if not options.instructions and not options.instructions_file:
-        parser.error('Either the --instructions-file (-ir) or --instructions (-i) argument must be given')
-
-    if options.instructions_file:
-        instructions_file = options.instructions_file
-        if os.path.exists(instructions_file):
-            with open(instructions_file, 'r', encoding='utf-8', errors='ignore') as f:
-                options.instructions = f.read()
-        else:
-            parser.error(f"The given file {instructions_file} doesn't exist")
-    return options
-
 
 def run_shellcode(encoding: list, interactive: bool, arch: str):
     sh = b"".join(pack("B", e) for e in encoding)
@@ -110,7 +28,7 @@ def run_shellcode(encoding: list, interactive: bool, arch: str):
     RtlMoveMemory.restype = None
     RtlMoveMemory.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
 
-    # Allocate memory for shellcode
+    # Allocate memory for the shellcode
     ptr = VirtualAlloc(None, len(shellcode), 0x3000, 0x40)
     if not ptr:
         raise ValueError("Failed to allocate memory.")
@@ -142,6 +60,7 @@ def run_shellcode(encoding: list, interactive: bool, arch: str):
         raise ValueError("Failed to create thread.")
 
     ctypes.windll.kernel32.WaitForSingleObject(ctypes.c_void_p(ht), -1)
+
 
 def format_shellcode(shellcode_bytes: bytearray, interval: int):
     # Function to generate opcode string and detect null bytes
@@ -210,6 +129,7 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
     opcodes_per_line = interval // 4 if interval > 0 else len(opcode_list)
 
     print(f"unsigned char {var_name}[] = {{")
+    print()
     for i in range(0, len(opcode_list), opcodes_per_line):
         # Join a chunk of opcodes for the current line
         line = ', '.join(opcode_list[i:i+opcodes_per_line])
@@ -221,40 +141,3 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
     print("};")
     print(f"unsigned int {var_name}_len = {shellcode_length};")
 
-
-
-def main():
-    options = get_arguments()
-
-    # Determine the architecture and mode for the Keystone engine
-    if options.arch == 'x86':
-        arch = KS_ARCH_X86
-        mode = KS_MODE_32
-    elif options.arch == 'x64':
-        arch = KS_ARCH_X86
-        mode = KS_MODE_64
-    else:
-        eprint(f"Unsupported architecture: {options.arch}")
-        sys.exit(1)
-
-    # Initialize the keystone engine with the specified architecture and mode
-    ks = Ks(arch, mode)
-
-    try:
-        shellcode_assembled, count = ks.asm(options.instructions)
-    except KsError as ks_error:
-        eprint(f"Shellcode compilation failed: {ks_error}")
-        exit(1)
-    eprint(f"[+] {count} instructions have been encoded")
-
-    if options.run:
-        run_shellcode(encoding=shellcode_assembled,
-                      interactive=options.interactive,
-                      arch=options.arch)
-    else:
-        print_shellcode(shellcode_assembled=shellcode_assembled, var_name=options.var_name, interval=options.interval,
-                        output_format=options.output_format)
-
-
-if __name__ == "__main__":
-    main()

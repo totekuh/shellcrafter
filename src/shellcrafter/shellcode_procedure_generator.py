@@ -1,74 +1,11 @@
 #!/usr/bin/env python3
-import os
 import binascii
-import pprint
-
+import os
 import sys
 
 module_path = os.path.dirname(__file__)
 sys.path.append(module_path)
 import numpy
-
-from argparse import ArgumentParser
-
-
-def get_arguments():
-    parser = ArgumentParser(description="Generate assembly instructions for various purposes")
-
-    commands = parser.add_argument_group('commands')
-    commands.add_argument('--push-for-ascii',
-                          dest='push_for_ascii',
-                          action='store_true',
-                          help='Generate push instructions for ASCII string')
-    commands.add_argument('--load-library',
-                          dest='load_library',
-                          action='store_true',
-                          help='Generate instructions for loading a DLL')
-    commands.add_argument('--null-free',
-                          dest='null_free',
-                          action='store_true',
-                          help='Avoid NULL bytes in the generated shellcode')
-    commands.add_argument('--hash',
-                          dest='hash',
-                          type=str,
-                          help='Compute a hash of the input string. '
-                               'Use --hash-alg argument to see the corresponding algorithm on assembly.')
-    commands.add_argument('--hash-alg',
-                          dest='hash_alg',
-                          action='store_true',
-                          help='Print out the hashing algorithm used to hash the value passed with the --hash flag.')
-    commands.add_argument('--write',
-                          dest='write',
-                          action='store_true',
-                          help='Generate instructions for writing an ASCII string to memory')
-    commands.add_argument("--print-data-types",
-                          dest="print_data_types",
-                          action="store_true",
-                          help="Print out information about commonly used Win32 data types")
-
-    arguments = parser.add_argument_group('arguments')
-    arguments.add_argument('--ascii-string',
-                           dest='ascii_string',
-                           type=str,
-                           help='Specify the ASCII string to convert to the HEX format '
-                                'for putting this onto the stack with `--push-for-ascii` command '
-                                'or to write to memory with `--write` command')
-    arguments.add_argument('--load-library-addr',
-                           dest='load_library_addr',
-                           type=str,
-                           help='Specify the absolute address in HEX or a relative offset; '
-                                'e.g., --load-library-addr "[ebp+0x14]" or --load-library-addr "0x51233345"')
-    arguments.add_argument('--load-library-dll-name',
-                           dest='load_library_dll_name',
-                           type=str,
-                           help='Specify the DLL name to load')
-    arguments.add_argument('--write-addr',
-                           dest='write_addr',
-                           type=str,
-                           help='Specify the address to write to in HEX or a relative offset; '
-                                'e.g., --write-addr "[ebp-0x50]" or --write-addr "0x51233345"')
-
-    return parser.parse_args()
 
 # Define data types
 data_types = {
@@ -204,7 +141,7 @@ data_types = {
     }
 }
 
-def print_hash_alg():
+def print_hash_algorithm():
     print("""
 compute_hash:
   xor eax, eax                 ;# NULL EAX
@@ -219,7 +156,9 @@ compute_hash_again:
   add edx, eax                 ;# add the new hashed byte to the accumulator
   jmp compute_hash_again       ;# next iteration
 
-compute_hash_finished:""")
+compute_hash_finished:
+  nop
+""")
 
 
 def ror_str(byte, count):
@@ -317,36 +256,3 @@ def write_to_memory(s: str, write_addr: str, null_free=False):
             write_offset = 'eax'
         print(f"  mov [{write_offset}], ecx ;# Write the part \"{part}\" of the string \"{s}\" to memory")
 
-
-def main():
-    options = get_arguments()
-    if options.hash_alg:
-        print_hash_alg()
-    elif options.print_data_types:
-        pprint.pprint(data_types, indent=4)
-    elif options.hash:
-        compute_hash(options.hash)
-    elif options.push_for_ascii:
-        if not options.ascii_string:
-            print("Error: --ascii-string is required when --push-for-ascii is given.")
-            sys.exit(1)
-        print(f"push_str:  ;# push the '{options.ascii_string}' onto the stack")
-        str_to_hex_little_endian_push(s=options.ascii_string, null_free=options.null_free)
-    elif options.load_library:
-        if not options.load_library_dll_name or not options.load_library_addr:
-            print("Error: --load-library-dll-name and --load-library-addr are required when --load-library is given.")
-            sys.exit(1)
-        generate_load_library(dll_name=options.load_library_dll_name, load_library_func_addr=options.load_library_addr,
-                              null_free=options.null_free)
-    elif options.write:
-        if not options.ascii_string or not options.write_addr:
-            print("Error: --ascii-string and --write-addr are required when --write is given.")
-            sys.exit(1)
-        write_to_memory(s=options.ascii_string, write_addr=options.write_addr, null_free=options.null_free)
-    else:
-        print("Error: Either --push-for-ascii, --write or --load-library must be given.")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

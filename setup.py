@@ -1,41 +1,42 @@
 #!/usr/bin/env python3
 
-version = "1.0.20"
+version = "1.0.21"
 
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+REPO_URL = 'https://github.com/totekuh/shellcrafter'
+
+
 setup(
     name="shellcrafter",
     version=version,
     description="A package containing scripts for developing and generating shellcode",
     long_description=long_description,
-    long_description_content_type='text/markdown',  # Add this line
+    long_description_content_type='text/markdown',
     author="totekuh",
     author_email="totekuh@protonmail.com",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     entry_points={
         "console_scripts": [
-            "keyst-api=shellcrafter.keyst_api:main",
-            "find-gadgets=shellcrafter.find_gadgets:main",
-            "shellcode-procedure-generator=shellcrafter.shellcode_procedure_generator:main",
+            "shellcrafter=shellcrafter.cli:app",
         ],
     },
-    url='https://github.com/totekuh/shellcrafter',  # Optional
+    url=REPO_URL,
     install_requires=[
-        "numpy",
+        "numpy",  # Depending on your CLI, some of these may no longer be necessary
         "keystone-engine",
         "termcolor",
         "rich",
         "ropper",
-        'capstone'
+        "capstone",
+        "typer",  # Added Typer to the list of required packages
     ],
     project_urls={  # Optional
-        'Bug Reports': 'https://github.com/totekuh/shellcrafter/issues',
-        'Source': 'https://github.com/totekuh/shellcrafter',
+        'Bug Reports': f'{REPO_URL}/issues',
+        'Source': REPO_URL,
     },
-
 )

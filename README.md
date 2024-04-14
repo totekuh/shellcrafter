@@ -1,149 +1,51 @@
 # Shellcrafter
 
-Shellcrafter is a package containing scripts for developing and generating shellcode.
-
-It provides a collection of utilities for working with shellcode in various ways, such as generating shellcode from assembly instructions, computing hashes from function names, converting ASCII text to hex stack push instructions, loading DLLs, and finding ROP gadgets.
+Shellcrafter is a comprehensive toolkit designed for shellcode development and gadget finding. It integrates several utilities to assist in the generation of shellcode from assembly instructions, conversion of ASCII text to hexadecimal stack push instructions, loading of DLLs, finding ROP gadgets, and more.
 
 ## Installation
 
-To install Shellcrafter, use pip:
+To install Shellcrafter, you can either install it directly using pip if it's available in the Python Package Index or by cloning the repository and installing it locally:
 
 ```bash
 $ pip3 install shellcrafter
 ```
 
-Or clone this repository and run:
+Or clone the repository and install using:
 
 ```bash
+$ git clone https://github.com/totekuh/shellcrafter.git
+$ cd shellcrafter
 $ pip3 install .
 ```
 
-
 ## Usage
 
-Shellcrafter provides the following command-line utilities:
+Shellcrafter is structured around multiple command-line utilities grouped under a Typer application. 
 
-- `keyst-api`: A shellcode generator using the Keystone Engine to assemble assembly instructions into shellcode.
-- `shellcode-procedure-generator`: A versatile tool for generating assembly instructions for various purposes. It can generate push instructions for ASCII strings, instructions for loading a DLL, write ASCII strings to memory, and compute a hash of an input string using an algorithm similar to the one used in assembly for importing a function by its hash. It also provides an option to avoid NULL bytes in the generated shellcode.
-- `find-gadgets`: Searches for clean, categorized gadgets from a given list of files.
+Here's how to use the various utilities:
 
-To get help on how to use each utility, run the corresponding command with the `-h` or `--help` flag:
+### Keystone API - Shellcode Compiler
+
+Compile shellcode from assembly instructions:
 
 ```bash
-$ keyst-api --help
-$ shellcode-procedure-generator --help
-$ find-gadgets --help
+$ shellcrafter shellcode compile --instructions "mov ax, 1"
+[+] 1 instructions have been encoded
+shellcode = b""
+shellcode += b"\x66\xb8\x01\x00"
+shellcode_len = 4
 ```
 
-## Examples
-
-Here are some examples of how to use the shellcode-procedure-generator tool:
-
-To generate push instructions for an ASCII string:
+Also for x64:
 
 ```bash
-$ shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll
-push_str:  ;# push the 'shell32.dll' onto the stack
-  push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
-  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-
+$ shellcrafter shellcode compile --instructions "mov ax, 1" --arch x64
 ```
 
-To generate push instructions for an ASCII string and escape the NULL bytes by using the negate approach:
+Supports compiling shellcode from a file:
 
 ```bash
-$ shellcode-procedure-generator --push-for-ascii --ascii-string shell32.dll --null-free
-push_str:  ;# push the 'shell32.dll' onto the stack
-  mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
-  neg eax ;# Negate EAX to get the original value
-  push eax ;# Push EAX onto the stack
-  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-
-```
-
-To generate instructions for loading a DLL:
-
-```bash
-$ shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll
-load_lib:  ;# load the shell32.dll DLL
-  xor eax, eax ;# NULL EAX
-  push 0x006c6c64 ;# Push the part "lld." of the string "shell32.dll" onto the stack
-  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
-  call dword ptr [ebp+0x10] ;# Call LoadLibraryA
-
-```
-
-To do the same, but escape the NULL byte:
-
-```bash
-$ shellcode-procedure-generator --load-library --load-library-addr "[ebp+0x10]" --load-library-dll-name shell32.dll --null-free
-load_lib:  ;# load the shell32.dll DLL
-  xor eax, eax ;# NULL EAX
-  mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "shell32.dll" to EAX to avoid NULL bytes
-  neg eax ;# Negate EAX to get the original value
-  push eax ;# Push EAX onto the stack
-  push 0x2e32336c ;# Push the part "23ll" of the string "shell32.dll" onto the stack
-  push 0x6c656873 ;# Push the part "ehs" of the string "shell32.dll" onto the stack
-  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
-  call dword ptr [ebp+0x10] ;# Call LoadLibraryA
-```
-
-To generate instructions for writing an ASCII string to memory:
-
-```bash
-$ shellcode-procedure-generator --write --ascii-string "http://kali/met.exe" --write-addr "[ebp-0x50]" 
-write_str: ;# write http://kali/met.exe to [ebp-0x50]
-  xor eax, eax  ;# NULL EAX
-  xor ecx, ecx  ;# NULL ECX
-  lea eax, [ebp-0x50] ;# Load the address to write to into EAX
-  mov ecx, 0x70747468 ;# Move the part "http" of the string "http://kali/met.exe" to ECX
-  mov [eax], ecx ;# Write the part "http" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x6b2f2f3a ;# Move the part "://k" of the string "http://kali/met.exe" to ECX
-  mov [eax+0x04], ecx ;# Write the part "://k" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x2f696c61 ;# Move the part "ali/" of the string "http://kali/met.exe" to ECX
-  mov [eax+0x08], ecx ;# Write the part "ali/" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x2e74656d ;# Move the part "met." of the string "http://kali/met.exe" to ECX
-  mov [eax+0x0c], ecx ;# Write the part "met." of the string "http://kali/met.exe" to memory
-  mov ecx, 0x00657865 ;# Move the part "exe" of the string "http://kali/met.exe" to ECX
-  mov [eax+0x10], ecx ;# Write the part "exe" of the string "http://kali/met.exe" to memory
-```
-
-To do the same, but escape the NULL byte:
-
-```bash
-$ shellcode-procedure-generator --write --ascii-string "http://kali/met.exe" --write-addr "[ebp-0x50]"  --null-free
-write_str: ;# write http://kali/met.exe to [ebp-0x50]
-  xor eax, eax  ;# NULL EAX
-  xor ecx, ecx  ;# NULL ECX
-  lea eax, [ebp-0x50] ;# Load the address to write to into EAX
-  mov ecx, 0x70747468 ;# Move the part "http" of the string "http://kali/met.exe" to ECX
-  mov [eax], ecx ;# Write the part "http" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x6b2f2f3a ;# Move the part "://k" of the string "http://kali/met.exe" to ECX
-  mov [eax+0x04], ecx ;# Write the part "://k" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x2f696c61 ;# Move the part "ali/" of the string "http://kali/met.exe" to ECX
-  mov [eax+0x08], ecx ;# Write the part "ali/" of the string "http://kali/met.exe" to memory
-  mov ecx, 0x2e74656d ;# Move the part "met." of the string "http://kali/met.exe" to ECX
-  mov [eax+0x0c], ecx ;# Write the part "met." of the string "http://kali/met.exe" to memory
-  mov ecx, 0xff9a879b ;# Move the negated value of the part "exe" of the string "http://kali/met.exe" to ECX to avoid NULL bytes
-  neg ecx ;# Negate ECX to get the original value
-  mov [eax+0x10], ecx ;# Write the part "exe" of the string "http://kali/met.exe" to memory
-```
-
-Calculate a hash of the given input string:
-
-```bash
-$ shellcode-procedure-generator --hash LoadLibraryA
-Hash: 0xec0e4e8e
-```
-
-Print out the hashing algorithm used to generate the hash value:
-
-```bash
-$ shellcode-procedure-generator --hash-alg                                                                                     
+$ cat hash.asm
 
 compute_hash:
   xor eax, eax                 ;# NULL EAX
@@ -159,4 +61,97 @@ compute_hash_again:
   jmp compute_hash_again       ;# next iteration
 
 compute_hash_finished:
+$ shellcrafter shellcode compile -if hash.asm 
+[+] 24 instructions have been encoded
+shellcode = b""
+shellcode += b"\x31\xc0\x99\xfc\xac\x84\xc0\x74\x07\xc1\xca\x0d\x01\xc2\xeb\xf4"
+shellcode_len = 16
+```
+
+For more help:
+
+```bash
+shellcrafter shellcode compile --help
+```
+
+### Shellcode Generator
+
+This tool can generate various types of shellcode operations:
+
+#### Generate Stack Push Instructions for an ASCII String
+
+Generate instructions for pushing the `example.dll` string on stack:
+```bash
+shellcrafter codegen push-ascii --ascii-string "example.dll"
+push_str:  ;# push the 'example.dll' onto the stack
+  push 0x006c6c64 ;# Push the part "lld." of the string "example.dll" onto the stack
+  push 0x2e656c70 ;# Push the part "elpm" of the string "example.dll" onto the stack
+  push 0x6d617865 ;# Push the part "axe" of the string "example.dll" onto the stack
+```
+
+Use the negate operation to avoid NULL byte if necessary:
+
+```bash
+shellcrafter codegen push-ascii --ascii-string "example.dll" --null-free
+push_str:  ;# push the 'example.dll' onto the stack
+  mov eax, 0xff93939c ;# Move the negated value of the part "lld." of the string "example.dll" to EAX to avoid NULL bytes
+  neg eax ;# Negate EAX to get the original value
+  push eax ;# Push EAX onto the stack
+  push 0x2e656c70 ;# Push the part "elpm" of the string "example.dll" onto the stack
+  push 0x6d617865 ;# Push the part "axe" of the string "example.dll" onto the stack
+```
+
+#### Load a DLL
+
+Generate code for loading a DLL into the target process. 
+The DLL's name and the address of the LoadLibraryA function have to be provided.
+```bash
+shellcrafter codegen load-library --dll-name "example.dll" --load-library-addr "[ebp-0x04]"
+load_lib:  ;# load the example.dll DLL
+  xor eax, eax ;# NULL EAX
+  push eax ;# Push NULL terminator for the string
+  push 0x006c6c64 ;# Push the part "lld." of the string "example.dll" onto the stack
+  push 0x2e656c70 ;# Push the part "elpm" of the string "example.dll" onto the stack
+  push 0x6d617865 ;# Push the part "axe" of the string "example.dll" onto the stack
+  push esp ;# Push ESP to have a pointer to the string that is currently located on the stack
+  call dword ptr [ebp-0x04] ;# Call LoadLibraryA
+```
+
+#### Write ASCII String to Memory
+
+Generate code for writing an ASCII string to the given memory address:
+
+```bash
+$ shellcrafter codegen write --ascii-string "http://example.com" --write-addr "[eax]"
+write_str: ;# write http://example.com to [eax]
+  xor eax, eax  ;# NULL EAX
+  xor ecx, ecx  ;# NULL ECX
+  lea eax, [eax] ;# Load the address to write to into EAX
+  mov ecx, 0x70747468 ;# Move the part "http" of the string "http://example.com" to ECX
+  mov [eax], ecx ;# Write the part "http" of the string "http://example.com" to memory
+  mov ecx, 0x652f2f3a ;# Move the part "://e" of the string "http://example.com" to ECX
+  mov [eax+0x04], ecx ;# Write the part "://e" of the string "http://example.com" to memory
+  mov ecx, 0x706d6178 ;# Move the part "xamp" of the string "http://example.com" to ECX
+  mov [eax+0x08], ecx ;# Write the part "xamp" of the string "http://example.com" to memory
+  mov ecx, 0x632e656c ;# Move the part "le.c" of the string "http://example.com" to ECX
+  mov [eax+0x0c], ecx ;# Write the part "le.c" of the string "http://example.com" to memory
+  mov ecx, 0x00006d6f ;# Move the part "om" of the string "http://example.com" to ECX
+  mov [eax+0x10], ecx ;# Write the part "om" of the string "http://example.com" to memory
+```
+
+### Gadget Finder
+
+Search for gadgets in binary files:
+
+```bash
+$ shellcrafter gadgets find-gadgets "wsock32.dll"
+```
+
+### Compute Hash of a Function Name
+
+Get ROR13 hash of the given string:
+
+```bash
+$ shellcrafter codegen hash "CreateProcess"
+Hash: 0x7fc622d6
 ```
