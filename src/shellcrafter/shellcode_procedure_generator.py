@@ -156,7 +156,9 @@ compute_hash_again:
   add edx, eax                 ;# add the new hashed byte to the accumulator
   jmp compute_hash_again       ;# next iteration
 
-compute_hash_finished:""")
+compute_hash_finished:
+  nop
+""")
 
 
 def ror_str(byte, count):

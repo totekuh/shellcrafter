@@ -7,6 +7,9 @@ from setuptools import setup, find_packages
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+REPO_URL = 'https://github.com/totekuh/shellcrafter'
+
+
 setup(
     name="shellcrafter",
     version=version,
@@ -19,14 +22,13 @@ setup(
     package_dir={"": "src"},
     entry_points={
         "console_scripts": [
-            "shellcrafter=shellcrafter.cli:main",  # Adjusted to point to the new unified CLI entry point
+            "shellcrafter=shellcrafter.cli:app",
         ],
     },
-    url='https://github.com/totekuh/shellcrafter',  # Optional
+    url=REPO_URL,
     install_requires=[
         "numpy",  # Depending on your CLI, some of these may no longer be necessary
         "keystone-engine",
-        "pprint",
         "termcolor",
         "rich",
         "ropper",
@@ -34,7 +36,7 @@ setup(
         "typer",  # Added Typer to the list of required packages
     ],
     project_urls={  # Optional
-        'Bug Reports': 'https://github.com/totekuh/shellcrafter/issues',
-        'Source': 'https://github.com/totekuh/shellcrafter',
+        'Bug Reports': f'{REPO_URL}/issues',
+        'Source': REPO_URL,
     },
 )

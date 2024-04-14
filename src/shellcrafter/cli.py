@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 from pprint import pprint
 import os
-
+import sys
 from keystone import *
 from typer import Typer, Option, Exit, Argument, echo
-from keyst_api import print_shellcode, run_shellcode_with_virtualalloc
+
+module_path = os.path.dirname(__file__)
+sys.path.append(module_path)
+
+from keyst_api import print_shellcode, run_shellcode, eprint
+from keyst_api import OUTPUT_FORMAT_PYTHON, X86_ARCH, X64_ARCH
 from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     data_types, \
     print_hash_algorithm, \
@@ -45,13 +50,8 @@ def print_data_types():
     pprint(data_types, indent=4)
 
 
-@codegen_app.command("print-hash-alg", help="Prints the pseudocode for a basic hashing algorithm.")
+@codegen_app.command("print-hash-alg", help="Prints the assembly code for ROR13 hashing algorithm.")
 def print_hash_alg():
-    """
-    Prints the assembly code for a basic hashing algorithm. This command outputs actual assembly
-    code that can be compiled and executed, demonstrating how a basic hash function operates at the
-    assembly level, which is useful for understanding low-level data processing and security operations.
-    """
     print_hash_algorithm()
 
 
@@ -170,34 +170,50 @@ def compile_shellcode(instructions: str = Option(None, "--instructions", "-i",
                                              help="Number of opcodes per line while printing the shellcode", min=0,
                                              max=192),
                       interactive: bool = Option(False, "--interactive", is_flag=True,
-                                                 help="Wait for user input before executing the shellcode")):
+                                                 help="Wait for user input before executing the shellcode"),
+                      output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format",
+                                                  help="Output format of the shellcode: 'python', 'c-array', or 'bin'."),
+                      arch: str = Option(X86_ARCH, "--arch",
+                                         help=f"Architecture for the assembly: '{X64_ARCH}' or '{X86_ARCH}'.")):
     """
     Compiles assembly instructions into shellcode and optionally executes it.
     """
     if instructions and instructions_file:
-        print("Either the --instructions-file (-if) or --instructions (-i) option must be given, not both.")
+        echo("Either the --instructions-file or --instructions option must be given, not both.", err=True)
         raise Exit(code=1)
     if not instructions and not instructions_file:
-        print("Either the --instructions-file (-if) or --instructions (-i) option must be given.")
+        echo("Either the --instructions-file or --instructions option must be given.", err=True)
         raise Exit(code=1)
 
     if instructions_file:
         instructions = read_instructions_from_file(instructions_file)
 
-    # Initialize the keystone engine in 32-bit mode
-    ks = Ks(KS_ARCH_X86, KS_MODE_32)
+    # Determine the architecture and mode for the Keystone engine
+    if arch == X86_ARCH:
+        ks_arch = KS_ARCH_X86
+        ks_mode = KS_MODE_32
+    elif arch == X64_ARCH:
+        ks_arch = KS_ARCH_X86
+        ks_mode = KS_MODE_64
+    else:
+        eprint(f"Unsupported architecture: {arch}")
+        sys.exit(1)
+
+    ks = Ks(ks_arch, ks_mode)
 
     try:
-        encoding, count = ks.asm(instructions)
+        shellcode_assembled, count = ks.asm(instructions)
+        eprint(f"[+] {count} instructions have been encoded")
     except KsError as ks_error:
-        print(f"Shellcode compilation failed: {ks_error}")
+        eprint(f"Shellcode compilation failed: {ks_error}", err=True)
         raise Exit(code=1)
-    print(f"[+] {count} instructions have been encoded")
 
     if run:
-        run_shellcode_with_virtualalloc(encoding=encoding, interactive=interactive)
+        run_shellcode(encoding=shellcode_assembled,
+                      interactive=interactive,
+                      arch=arch)
     else:
-        print_shellcode(encoding=encoding, var_name=var_name, interval=interval)
+        print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
 
 
 if __name__ == "__main__":
