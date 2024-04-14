@@ -5,7 +5,6 @@ from struct import pack
 from termcolor import colored
 
 
-
 def run_shellcode_with_virtualalloc(encoding: list, interactive: bool):
     sh = b""
     for e in encoding:
@@ -67,4 +66,3 @@ def print_shellcode(encoding: list, var_name: str, interval: int):
     if "\\x00" in instructions:
         print()
         print(f"[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
-

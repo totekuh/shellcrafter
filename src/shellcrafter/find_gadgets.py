@@ -16,6 +16,48 @@ from rich.markup import escape
 from ropper import RopperService
 
 
+def do_find_gadgets(
+        files: list,
+        bad_chars: list,
+        arch: str,
+        output: str,
+        color: bool,
+        skip_rp: bool
+):
+    """
+    This command searches for gadgets in the given files, allowing for detailed configuration of what is considered a 'bad character',
+    the architecture of the files, and whether to output the results colorized. Additional tools like rp++ can be skipped if specified.
+    """
+    if platform.system() == "Darwin":
+        # Fix issue with Ropper in macOS
+        multiprocessing.set_start_method('fork')
+
+    g = Gadgetizer(files, bad_chars, output, arch, color)
+    tree = Tree(f'[bright_green][+][/bright_green] Categorized gadgets :: {" ".join(sys.argv)}')
+    g.add_gadgets_to_tree(tree)
+
+    print(tree)
+
+    with open(f"{g.output}.clean", "w") as f:
+        print(tree, file=f)
+
+    print(f"[bright_green][+][/bright_green] Collection of all gadgets written to [bright_blue]{output}[/bright_blue]")
+    g.save()
+
+    if skip_rp:
+        return
+
+    for file in files:
+        if ":" in file:
+            file, base = file.split(":")
+            add_missing_gadgets(g.addresses, file, output, bad_bytes=bad_chars, base_address=base)
+        else:
+            add_missing_gadgets(g.addresses, file, output, bad_bytes=bad_chars)
+
+    clean_up_all_gadgets(output)
+    print_useful_regex(output, arch)
+
+
 class Gadgetizer:
     def __init__(self, files, badbytes, output, arch, color):
         self.arch = arch
@@ -39,6 +81,7 @@ class Gadgetizer:
         rs = RopperService(options)
 
         for file in self.files:
+            print(f"Processing {file}")
             if ":" in file:
                 file, base = file.split(":")
                 rs.addFile(file, arch=self.arch)
