@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import ctypes
+import errno
 import os
 import sys
 from struct import pack
-from typer import echo, Exit
-from termcolor import colored
+
 from keystone import *
-import mmap
+from termcolor import colored
+from typer import echo, Exit
 
 OUTPUT_FORMAT_PYTHON = 'python'
 OUTPUT_FORMAT_C_ARRAY = 'c-array'
@@ -87,8 +88,6 @@ def run_shellcode(encoding, interactive, arch, platform):
         raise ValueError("Unsupported platform or architecture.")
     print("[+] Shellcode execution finished")
 
-import ctypes
-import errno
 
 def run_shellcode_on_linux(interactive, shellcode):
     libc = ctypes.CDLL("libc.so.6")
@@ -111,18 +110,22 @@ def run_shellcode_on_linux(interactive, shellcode):
     if interactive:
         input("[!] Press Enter to execute shellcode")
 
-    print(f"[*] Executing shellcode...")
+    print("[*] Executing shellcode...")
 
-    FUNC_TYPE = ctypes.CFUNCTYPE(None)
+    FUNC_TYPE = ctypes.CFUNCTYPE(ctypes.c_int64)  # Define function type that returns an int64
     shellcode_func = FUNC_TYPE(ptr)
 
     thread = ctypes.c_void_p()
+    retval = ctypes.c_int64()  # This will hold the return value from the shellcode
+
     err = libpthread.pthread_create(ctypes.byref(thread), None, shellcode_func, None)
     if err != 0:
         raise Exception(f"Error creating thread with error code: {errno.errorcode[err]}")
 
-    if libpthread.pthread_join(thread, None) != 0:
+    if libpthread.pthread_join(thread, ctypes.byref(retval)) != 0:
         raise Exception("Error joining thread")
+
+    print(f"Shellcode returned: {retval.value}")
 
 
 def run_shellcode_on_windows(arch, encoding, interactive):
