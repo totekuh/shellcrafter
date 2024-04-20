@@ -81,15 +81,19 @@ def run_shellcode(encoding, interactive, arch, platform):
     print(f"[*] Detected platform: {platform}")
 
     if platform == 'windows':
-        run_shellcode_on_windows(arch, encoding, interactive)
+        run_shellcode_on_windows(arch=arch,
+                                 shellcode=bytearray(b"".join(pack("B", e) for e in encoding)),
+                                 interactive=interactive)
     elif platform == 'linux':
-        run_shellcode_on_linux(interactive, shellcode=bytearray(encoding))
+        run_shellcode_on_linux(arch=arch,
+                               shellcode=bytearray(encoding),
+                               interactive=interactive)
     else:
         raise ValueError("Unsupported platform or architecture.")
     print("[+] Shellcode execution finished")
 
 
-def run_shellcode_on_linux(interactive, shellcode):
+def run_shellcode_on_linux(arch, shellcode, interactive):
     libc = ctypes.CDLL("libc.so.6")
     libpthread = ctypes.CDLL("libpthread.so.0")
 
@@ -128,9 +132,7 @@ def run_shellcode_on_linux(interactive, shellcode):
     print(f"Shellcode returned: {retval.value}")
 
 
-def run_shellcode_on_windows(arch, encoding, interactive):
-    sh = b"".join(pack("B", e) for e in encoding)
-    shellcode = bytearray(sh)
+def run_shellcode_on_windows(arch, shellcode, interactive):
 
     VirtualAlloc = ctypes.windll.kernel32.VirtualAlloc
     VirtualAlloc.restype = ctypes.c_void_p
@@ -158,7 +160,7 @@ def run_shellcode_on_windows(arch, encoding, interactive):
     CreateThread.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
                              ctypes.c_void_p]
 
-    if arch == 'x64':
+    if arch == X64_ARCH:
         thread_id = ctypes.c_ulonglong()
     else:
         thread_id = ctypes.c_ulong()
