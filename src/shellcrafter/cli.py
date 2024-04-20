@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 from pprint import pprint
 import os
+import platform
 import sys
-from keystone import *
+from keyst_api import get_instructions, assemble_instructions
 from typer import Typer, Option, Exit, Argument, echo
 
 module_path = os.path.dirname(__file__)
@@ -30,15 +31,6 @@ gadgets_app = Typer(help="Searches for clean, categorized gadgets from a given l
 app.add_typer(gadgets_app, name="gadgets")
 
 DEFAULT_VAR_NAME = "shellcode"
-
-
-def read_instructions_from_file(filepath: str) -> str:
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
-    else:
-        print(f"The given file {filepath} doesn't exist")
-        raise Exit(code=1)
 
 
 @codegen_app.command(help="Displays a list of common data types used in Windows programming with their descriptions.")
@@ -157,63 +149,34 @@ def find_gadgets(
 
 
 @shellcode_app.command("compile",
-                       help="Compiles assembly instructions into executable shellcode, "
-                            "with options to execute or print it.")
-def compile_shellcode(instructions: str = Option(None, "--instructions", "-i",
-                                                 help="Assembly instructions to generate the shellcode"),
-                      instructions_file: str = Option(None, "--instructions-file", "-if",
-                                                      help="File with assembly instructions to generate the shellcode"),
-                      run: bool = Option(False, "--run", "-r", help="Execute the shellcode after compiling"),
-                      var_name: str = Option(DEFAULT_VAR_NAME, "--var-name", "-vn",
-                                             help="Variable name for the shellcode"),
+                       help="Compiles assembly instructions into executable shellcode.")
+def compile_shellcode(instructions: str = Option(None, "--instructions", "-i"),
+                      instructions_file: str = Option(None, "--instructions-file", "-if"),
+                      var_name: str = Option(DEFAULT_VAR_NAME, "--var-name", "-vn"),
                       interval: int = Option(48, "--interval",
-                                             help="Number of opcodes per line while printing the shellcode", min=0,
-                                             max=192),
-                      interactive: bool = Option(False, "--interactive", is_flag=True,
-                                                 help="Wait for user input before executing the shellcode"),
-                      output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format",
-                                                  help="Output format of the shellcode: 'python', 'c-array', or 'bin'."),
-                      arch: str = Option(X86_ARCH, "--arch",
-                                         help=f"Architecture for the assembly: '{X64_ARCH}' or '{X86_ARCH}'.")):
-    """
-    Compiles assembly instructions into shellcode and optionally executes it.
-    """
-    if instructions and instructions_file:
-        echo("Either the --instructions-file or --instructions option must be given, not both.", err=True)
-        raise Exit(code=1)
-    if not instructions and not instructions_file:
-        echo("Either the --instructions-file or --instructions option must be given.", err=True)
-        raise Exit(code=1)
+                                             help="Number of opcodes per line while printing the shellcode"),
+                      output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format"),
+                      arch: str = Option(X86_ARCH, "--arch")):
+    instructions = get_instructions(instructions, instructions_file)
+    shellcode_assembled, count = assemble_instructions(instructions, arch)
+    eprint(f"[+] {count} instructions have been encoded")
+    print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
 
-    if instructions_file:
-        instructions = read_instructions_from_file(instructions_file)
-
-    # Determine the architecture and mode for the Keystone engine
-    if arch == X86_ARCH:
-        ks_arch = KS_ARCH_X86
-        ks_mode = KS_MODE_32
-    elif arch == X64_ARCH:
-        ks_arch = KS_ARCH_X86
-        ks_mode = KS_MODE_64
-    else:
-        eprint(f"Unsupported architecture: {arch}")
-        sys.exit(1)
-
-    ks = Ks(ks_arch, ks_mode)
-
-    try:
-        shellcode_assembled, count = ks.asm(instructions)
-        eprint(f"[+] {count} instructions have been encoded")
-    except KsError as ks_error:
-        eprint(f"Shellcode compilation failed: {ks_error}", err=True)
+@shellcode_app.command("run", help="Executes the compiled shellcode on the detected platform.")
+def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i"),
+                          instructions_file: str = Option(None, "--instructions-file", "-if"),
+                          interactive: bool = Option(False, "--interactive"),
+                          arch: str = Option(X86_ARCH, "--arch")):
+    detected_platform = platform.system().lower()
+    if detected_platform not in ['windows', 'linux']:
+        echo("Unsupported platform.", err=True)
         raise Exit(code=1)
 
-    if run:
-        run_shellcode(encoding=shellcode_assembled,
-                      interactive=interactive,
-                      arch=arch)
-    else:
-        print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
+    instructions = get_instructions(instructions, instructions_file)
+    shellcode_assembled, count = assemble_instructions(instructions, arch)
+    eprint(f"[+] {count} instructions have been encoded")
+    run_shellcode(shellcode_assembled, interactive=interactive, arch=arch, platform=detected_platform)
+
 
 
 if __name__ == "__main__":

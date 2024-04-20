@@ -3,7 +3,10 @@ import ctypes
 import os
 import sys
 from struct import pack
+from typer import echo, Exit
 from termcolor import colored
+from keystone import *
+import mmap
 
 OUTPUT_FORMAT_PYTHON = 'python'
 OUTPUT_FORMAT_C_ARRAY = 'c-array'
@@ -12,14 +15,126 @@ OUTPUT_FORMAT_BIN = 'bin'
 X86_ARCH = 'x86'
 X64_ARCH = 'x64'
 
+
+def read_instructions_from_file(filepath: str) -> str:
+    if os.path.exists(filepath):
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
+    else:
+        print(f"The given file {filepath} doesn't exist")
+        raise Exit(code=1)
+
+
+def get_instructions(instructions: str, instructions_file: str):
+    """ Retrieves assembly instructions from a file or direct input. """
+    if instructions and instructions_file:
+        echo("Either the --instructions-file or --instructions option must be given, not both.", err=True)
+        raise Exit(code=1)
+    if not instructions and not instructions_file:
+        echo("Either the --instructions-file or --instructions option must be given.", err=True)
+        raise Exit(code=1)
+
+    if instructions_file:
+        if not os.path.exists(instructions_file):
+            echo("The given instructions file doesn't exist.", err=True)
+            raise Exit(code=1)
+        # Read the file content to check if it's empty.
+        with open(instructions_file, 'r', encoding='utf-8') as file:
+            contents = file.read()
+            if not contents:
+                echo("The file --instructions-file seems to be empty.", err=True)
+                raise Exit(code=1)
+        return read_instructions_from_file(instructions_file)
+    return instructions
+
+
+def assemble_instructions(instructions: str, arch: str):
+    """ Assemble instructions based on architecture. """
+    if arch == X86_ARCH:
+        ks_arch = KS_ARCH_X86
+        ks_mode = KS_MODE_32
+    elif arch == X64_ARCH:
+        ks_arch = KS_ARCH_X86
+        ks_mode = KS_MODE_64
+    else:
+        eprint(f"Unsupported architecture: {arch}")
+        sys.exit(1)
+
+    ks = Ks(ks_arch, ks_mode)
+    try:
+        return ks.asm(instructions)
+    except KsError as ks_error:
+        if "INVALIDOPERAND" in str(ks_error):
+            eprint(f"Invalid operand error. Wrong architecture?")
+            raise Exit(code=1)
+        else:
+            eprint(f"Shellcode compilation failed: {ks_error}")
+            raise Exit(code=1)
+
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-def run_shellcode(encoding: list, interactive: bool, arch: str):
+
+def run_shellcode(encoding, interactive, arch, platform):
+    print(f"[*] Detected platform: {platform}")
+
+    if platform == 'windows':
+        run_shellcode_on_windows(arch, encoding, interactive)
+    elif platform == 'linux':
+        echo("Not supported yet")
+        raise Exit(code=1)
+    else:
+        raise ValueError("Unsupported platform or architecture.")
+    print("[+] Shellcode execution finished")
+
+
+def run_shellcode_on_linux(interactive, shellcode):
+    pass
+    # libc = ctypes.CDLL("libc.so.6")
+    # libpthread = ctypes.CDLL("libpthread.so.0")
+    #
+    # # Define mmap and pthread_create prototypes
+    # libc.mmap.restype = ctypes.c_void_p
+    # libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_size_t]
+    #
+    # page_size = libc.getpagesize()
+    # PROT_READ_WRITE_EXEC = 0x7
+    # MAP_PRIVATE_ANON = 0x22
+    #
+    # # Allocate executable memory
+    # ptr = libc.mmap(None, page_size, PROT_READ_WRITE_EXEC, MAP_PRIVATE_ANON, -1, 0)
+    # if ptr == -1:
+    #     raise Exception("Memory allocation failed")
+    #
+    # # Copy shellcode to the allocated memory
+    # shellcode_bytes = (ctypes.c_char * len(shellcode)).from_buffer_copy(shellcode)
+    # ctypes.memmove(ptr, shellcode_bytes, len(shellcode))
+    #
+    # if interactive:
+    #     input("[!] Press Enter to execute shellcode")
+    #
+    # print(f"[*] Executing shellcode...")
+    #
+    # # Define a thread function wrapper for our shellcode
+    # FUNC_TYPE = ctypes.CFUNCTYPE(None)
+    # shellcode_func = FUNC_TYPE(ptr)
+    #
+    # thread = ctypes.c_void_p()
+    # err = libpthread.pthread_create(ctypes.byref(thread), None, shellcode_func, None)
+    # if err != 0:
+    #     raise Exception("Error creating thread with error code: {}".format(err))
+    #
+    # if libpthread.pthread_join(thread, None) != 0:
+    #     raise Exception("Error joining thread")
+    #
+    # print("[+] Shellcode execution completed")
+
+
+def run_shellcode_on_windows(arch, encoding, interactive):
     sh = b"".join(pack("B", e) for e in encoding)
     shellcode = bytearray(sh)
 
-    # Setting restype and argtypes for VirtualAlloc and CreateThread
     VirtualAlloc = ctypes.windll.kernel32.VirtualAlloc
     VirtualAlloc.restype = ctypes.c_void_p
     VirtualAlloc.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_ulong, ctypes.c_ulong]
@@ -28,14 +143,12 @@ def run_shellcode(encoding: list, interactive: bool, arch: str):
     RtlMoveMemory.restype = None
     RtlMoveMemory.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
 
-    # Allocate memory for the shellcode
     ptr = VirtualAlloc(None, len(shellcode), 0x3000, 0x40)
     if not ptr:
         raise ValueError("Failed to allocate memory.")
 
     buf = (ctypes.c_char * len(shellcode)).from_buffer(shellcode)
     RtlMoveMemory(ptr, buf, len(shellcode))
-
     eprint(f"[*] Shellcode located at address {hex(ptr)}")
 
     if interactive:
@@ -43,15 +156,13 @@ def run_shellcode(encoding: list, interactive: bool, arch: str):
 
     eprint(f"[*] Executing shellcode...")
 
-    # Adjusting for x64 architecture with CreateThread
-    if arch == 'x64':
-        # Ensure compatibility with x64 by using correct types
-        CreateThread = ctypes.windll.kernel32.CreateThread
-        CreateThread.restype = ctypes.c_void_p
-        CreateThread.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
-                                 ctypes.c_void_p]
+    CreateThread = ctypes.windll.kernel32.CreateThread
+    CreateThread.restype = ctypes.c_void_p
+    CreateThread.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
+                             ctypes.c_void_p]
 
-        thread_id = ctypes.c_ulonglong()  # For x64, use c_ulonglong
+    if arch == 'x64':
+        thread_id = ctypes.c_ulonglong()
     else:
         thread_id = ctypes.c_ulong()
 
@@ -93,7 +204,7 @@ def print_shellcode(shellcode_assembled: list, var_name: str, interval: int, out
         print_c_array(formatted_opcodes=formatted_opcodes,
                       null_byte_detected=null_byte_detected,
                       var_name=var_name,
-                               shellcode_length=shellcode_length, interval=interval)
+                      shellcode_length=shellcode_length, interval=interval)
     elif output_format == OUTPUT_FORMAT_BIN:
         os.write(1, shellcode_bytes)
 
@@ -113,7 +224,9 @@ def print_python_shellcode(formatted_opcodes: str, null_byte_detected: bool, var
     else:
         print(shellcode)
 
-def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: str, shellcode_length: int, interval: int):
+
+def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: str, shellcode_length: int,
+                  interval: int):
     # Ensure each byte is properly formatted as 0xXX
     opcodes = formatted_opcodes.replace("\\x", "0x")
 
@@ -132,7 +245,7 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
     print()
     for i in range(0, len(opcode_list), opcodes_per_line):
         # Join a chunk of opcodes for the current line
-        line = ', '.join(opcode_list[i:i+opcodes_per_line])
+        line = ', '.join(opcode_list[i:i + opcodes_per_line])
         # Check if this is the last line to avoid adding a comma at the end
         if i + opcodes_per_line < len(opcode_list):
             print(f"  {line.strip()},")
@@ -140,4 +253,3 @@ def print_c_array(formatted_opcodes: str, null_byte_detected: bool, var_name: st
             print(f"  {line}")
     print("};")
     print(f"unsigned int {var_name}_len = {shellcode_length};")
-
