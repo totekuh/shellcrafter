@@ -82,53 +82,47 @@ def run_shellcode(encoding, interactive, arch, platform):
     if platform == 'windows':
         run_shellcode_on_windows(arch, encoding, interactive)
     elif platform == 'linux':
-        echo("Not supported yet")
-        raise Exit(code=1)
+        run_shellcode_on_linux(interactive, shellcode=bytearray(encoding))
     else:
         raise ValueError("Unsupported platform or architecture.")
     print("[+] Shellcode execution finished")
 
+import ctypes
+import errno
 
 def run_shellcode_on_linux(interactive, shellcode):
-    pass
-    # libc = ctypes.CDLL("libc.so.6")
-    # libpthread = ctypes.CDLL("libpthread.so.0")
-    #
-    # # Define mmap and pthread_create prototypes
-    # libc.mmap.restype = ctypes.c_void_p
-    # libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_size_t]
-    #
-    # page_size = libc.getpagesize()
-    # PROT_READ_WRITE_EXEC = 0x7
-    # MAP_PRIVATE_ANON = 0x22
-    #
-    # # Allocate executable memory
-    # ptr = libc.mmap(None, page_size, PROT_READ_WRITE_EXEC, MAP_PRIVATE_ANON, -1, 0)
-    # if ptr == -1:
-    #     raise Exception("Memory allocation failed")
-    #
-    # # Copy shellcode to the allocated memory
-    # shellcode_bytes = (ctypes.c_char * len(shellcode)).from_buffer_copy(shellcode)
-    # ctypes.memmove(ptr, shellcode_bytes, len(shellcode))
-    #
-    # if interactive:
-    #     input("[!] Press Enter to execute shellcode")
-    #
-    # print(f"[*] Executing shellcode...")
-    #
-    # # Define a thread function wrapper for our shellcode
-    # FUNC_TYPE = ctypes.CFUNCTYPE(None)
-    # shellcode_func = FUNC_TYPE(ptr)
-    #
-    # thread = ctypes.c_void_p()
-    # err = libpthread.pthread_create(ctypes.byref(thread), None, shellcode_func, None)
-    # if err != 0:
-    #     raise Exception("Error creating thread with error code: {}".format(err))
-    #
-    # if libpthread.pthread_join(thread, None) != 0:
-    #     raise Exception("Error joining thread")
-    #
-    # print("[+] Shellcode execution completed")
+    libc = ctypes.CDLL("libc.so.6")
+    libpthread = ctypes.CDLL("libpthread.so.0")
+
+    libc.mmap.restype = ctypes.c_void_p
+    libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_size_t]
+
+    page_size = libc.getpagesize()
+    PROT_READ_WRITE_EXEC = 0x7
+    MAP_PRIVATE_ANON = 0x22
+
+    ptr = libc.mmap(None, page_size, PROT_READ_WRITE_EXEC, MAP_PRIVATE_ANON, -1, 0)
+    if ptr == ctypes.c_void_p(-1).value:
+        raise Exception(f"Memory allocation failed with error: {errno.errorcode[ctypes.get_errno()]}")
+
+    shellcode_bytes = (ctypes.c_char * len(shellcode)).from_buffer_copy(shellcode)
+    ctypes.memmove(ptr, shellcode_bytes, len(shellcode))
+
+    if interactive:
+        input("[!] Press Enter to execute shellcode")
+
+    print(f"[*] Executing shellcode...")
+
+    FUNC_TYPE = ctypes.CFUNCTYPE(None)
+    shellcode_func = FUNC_TYPE(ptr)
+
+    thread = ctypes.c_void_p()
+    err = libpthread.pthread_create(ctypes.byref(thread), None, shellcode_func, None)
+    if err != 0:
+        raise Exception(f"Error creating thread with error code: {errno.errorcode[err]}")
+
+    if libpthread.pthread_join(thread, None) != 0:
+        raise Exception("Error joining thread")
 
 
 def run_shellcode_on_windows(arch, encoding, interactive):
