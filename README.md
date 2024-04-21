@@ -80,7 +80,7 @@ This tool can generate various types of shellcode operations:
 
 #### Generate Stack Push Instructions for an ASCII String
 
-Generate instructions for pushing the `example.dll` string on stack:
+Generate instructions for pushing the `example.dll` string on the stack:
 ```bash
 shellcrafter codegen push-ascii --ascii-string "example.dll"
 push_str:  ;# push the 'example.dll' onto the stack
