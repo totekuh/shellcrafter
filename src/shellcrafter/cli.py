@@ -3,14 +3,13 @@ from pprint import pprint
 import os
 import platform
 import sys
-from keyst_api import get_instructions, assemble_instructions
 from typer import Typer, Option, Exit, Argument, echo
 
 module_path = os.path.dirname(__file__)
 sys.path.append(module_path)
 
-from keyst_api import print_shellcode, run_shellcode, eprint
-from keyst_api import OUTPUT_FORMAT_PYTHON, X86_ARCH, X64_ARCH
+from keyst_api import ShellcodeCompiler, ShellcodeRunner, get_instructions, print_shellcode
+from keyst_api import OUTPUT_FORMAT_PYTHON, X86_ARCH
 from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     data_types, \
     print_hash_algorithm, \
@@ -73,7 +72,6 @@ write_addr_option = Option(...,
 def write(ascii_string: str = ascii_option,
           write_addr: str = write_addr_option,
           null_free: bool = null_free_option):
-    print(f"push_str:  ;# push the '{ascii_string}' onto the stack")
     write_to_memory(s=ascii_string, write_addr=write_addr, null_free=null_free)
 
 
@@ -157,26 +155,24 @@ def compile_shellcode(instructions: str = Option(None, "--instructions", "-i"),
                                              help="Number of opcodes per line while printing the shellcode"),
                       output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format"),
                       arch: str = Option(X86_ARCH, "--arch")):
-    instructions = get_instructions(instructions, instructions_file)
-    shellcode_assembled, count = assemble_instructions(instructions, arch)
-    eprint(f"[+] {count} instructions have been encoded")
+    shellcode_compiler = ShellcodeCompiler(arch=arch)
+    shellcode_assembled, count = shellcode_compiler.assemble_instructions(
+        instructions=get_instructions(instructions, instructions_file))
     print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
+
 
 @shellcode_app.command("run", help="Executes the compiled shellcode on the detected platform.")
 def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i"),
                           instructions_file: str = Option(None, "--instructions-file", "-if"),
                           interactive: bool = Option(False, "--interactive"),
                           arch: str = Option(X86_ARCH, "--arch")):
-    detected_platform = platform.system().lower()
-    if detected_platform not in ['windows', 'linux']:
-        echo("Unsupported platform.", err=True)
-        raise Exit(code=1)
+    shellcode_runner = ShellcodeRunner(arch=arch)
+    shellcode_compiler = ShellcodeCompiler(arch=arch)
 
-    instructions = get_instructions(instructions, instructions_file)
-    shellcode_assembled, count = assemble_instructions(instructions, arch)
-    eprint(f"[+] {count} instructions have been encoded")
-    run_shellcode(shellcode_assembled, interactive=interactive, arch=arch, platform=detected_platform)
+    shellcode_assembled, count = shellcode_compiler.assemble_instructions(
+        instructions=get_instructions(instructions, instructions_file))
 
+    shellcode_runner.run_shellcode(shellcode_assembled, interactive=interactive)
 
 
 if __name__ == "__main__":
