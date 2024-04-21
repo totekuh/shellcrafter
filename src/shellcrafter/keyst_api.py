@@ -74,7 +74,7 @@ class ShellcodeRunner:
     def run_shellcode(self,
                       shellcode,
                       interactive):
-        print(f"[*] Detected platform: {self.platform}")
+        eprint(f"[*] Detected platform: {self.platform}")
 
         if self.platform == 'windows':
             self.run_shellcode_on_windows(shellcode=bytearray(b"".join(pack("B", e) for e in shellcode)),
@@ -84,7 +84,7 @@ class ShellcodeRunner:
                                         interactive=interactive)
         else:
             raise ValueError("Unsupported platform or architecture.")
-        print("[+] Shellcode execution finished")
+        eprint("[+] Shellcode execution finished")
 
     def run_shellcode_on_linux(self, shellcode, interactive):
         libc = ctypes.CDLL("libc.so.6")
@@ -106,10 +106,10 @@ class ShellcodeRunner:
         ctypes.memmove(ptr, shellcode_bytes, len(shellcode))
 
         if interactive:
-            print(f"[*] PID: {os.getpid()}")
+            eprint(f"[*] PID: {os.getpid()}")
             input(f"[!] Press Enter to execute shellcode.")
 
-        print("[*] Executing shellcode...")
+        eprint("[*] Executing shellcode...")
 
         # Choose the correct function type based on architecture
         if self.arch == X64_ARCH:
@@ -131,7 +131,7 @@ class ShellcodeRunner:
         if libpthread.pthread_join(thread, ctypes.byref(retval)) != 0:
             raise Exception("Error joining thread")
 
-        print(f"Shellcode returned: {retval.value}")
+        eprint(f"Shellcode returned: {retval.value}")
 
     def run_shellcode_on_windows(self, shellcode, interactive):
         VirtualAlloc = ctypes.windll.kernel32.VirtualAlloc
@@ -228,7 +228,7 @@ def print_shellcode(shellcode_assembled: list, var_name: str, interval: int, out
             if null_byte_detected:
                 shellcode = shellcode.replace("\\x00", colored("\\x00", 'red'))
                 print(shellcode)
-                print("\n[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
+                eprint("\n[!] Your shellcode seems to contain NULL bytes. You probably have to get rid of them.")
             else:
                 print(shellcode)
 

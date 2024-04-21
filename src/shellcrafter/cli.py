@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from pprint import pprint
 import os
-import platform
 import sys
 from typer import Typer, Option, Exit, Argument, echo
 
