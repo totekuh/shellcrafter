@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-version = "1.1.0"
+version = "1.1.2"
 
 from setuptools import setup, find_packages
 
@@ -33,7 +33,8 @@ setup(
         "rich",
         "ropper",
         "capstone",
-        "typer",  # Added Typer to the list of required packages
+        "typer",
+        "pefile"
     ],
     project_urls={  # Optional
         'Bug Reports': f'{REPO_URL}/issues',

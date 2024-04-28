@@ -2,14 +2,13 @@
 from pprint import pprint
 import os
 import sys
-from keystone import *
 from typer import Typer, Option, Exit, Argument, echo
 
 module_path = os.path.dirname(__file__)
 sys.path.append(module_path)
 
-from keyst_api import print_shellcode, run_shellcode, eprint
-from keyst_api import OUTPUT_FORMAT_PYTHON, X86_ARCH, X64_ARCH
+from keyst_api import ShellcodeCompiler, ShellcodeRunner, get_instructions, print_shellcode
+from keyst_api import OUTPUT_FORMAT_PYTHON, X86_ARCH
 from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     data_types, \
     print_hash_algorithm, \
@@ -17,6 +16,7 @@ from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     generate_load_library, \
     write_to_memory
 from find_gadgets import do_find_gadgets
+from peutils import *
 
 app = Typer(help="Shellcrafter: A tool for shellcode development and gadget finding.", add_completion=False)
 
@@ -29,16 +29,13 @@ app.add_typer(codegen_app, name="codegen")
 gadgets_app = Typer(help="Searches for clean, categorized gadgets from a given list of files.")
 app.add_typer(gadgets_app, name="gadgets")
 
+# Creating a sub-command group for iat operations
+pe_app = Typer(help="PE related operations")
+
+# Adding the iat sub-command group to the main app
+app.add_typer(pe_app, name="pe")
+
 DEFAULT_VAR_NAME = "shellcode"
-
-
-def read_instructions_from_file(filepath: str) -> str:
-    if os.path.exists(filepath):
-        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
-    else:
-        print(f"The given file {filepath} doesn't exist")
-        raise Exit(code=1)
 
 
 @codegen_app.command(help="Displays a list of common data types used in Windows programming with their descriptions.")
@@ -81,7 +78,6 @@ write_addr_option = Option(...,
 def write(ascii_string: str = ascii_option,
           write_addr: str = write_addr_option,
           null_free: bool = null_free_option):
-    print(f"push_str:  ;# push the '{ascii_string}' onto the stack")
     write_to_memory(s=ascii_string, write_addr=write_addr, null_free=null_free)
 
 
@@ -157,63 +153,70 @@ def find_gadgets(
 
 
 @shellcode_app.command("compile",
-                       help="Compiles assembly instructions into executable shellcode, "
-                            "with options to execute or print it.")
-def compile_shellcode(instructions: str = Option(None, "--instructions", "-i",
-                                                 help="Assembly instructions to generate the shellcode"),
-                      instructions_file: str = Option(None, "--instructions-file", "-if",
-                                                      help="File with assembly instructions to generate the shellcode"),
-                      run: bool = Option(False, "--run", "-r", help="Execute the shellcode after compiling"),
-                      var_name: str = Option(DEFAULT_VAR_NAME, "--var-name", "-vn",
-                                             help="Variable name for the shellcode"),
+                       help="Compiles assembly instructions into executable shellcode.")
+def compile_shellcode(instructions: str = Option(None, "--instructions", "-i"),
+                      instructions_file: str = Option(None, "--instructions-file", "-if"),
+                      var_name: str = Option(DEFAULT_VAR_NAME, "--var-name", "-vn"),
                       interval: int = Option(48, "--interval",
-                                             help="Number of opcodes per line while printing the shellcode", min=0,
-                                             max=192),
-                      interactive: bool = Option(False, "--interactive", is_flag=True,
-                                                 help="Wait for user input before executing the shellcode"),
-                      output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format",
-                                                  help="Output format of the shellcode: 'python', 'c-array', or 'bin'."),
-                      arch: str = Option(X86_ARCH, "--arch",
-                                         help=f"Architecture for the assembly: '{X64_ARCH}' or '{X86_ARCH}'.")):
-    """
-    Compiles assembly instructions into shellcode and optionally executes it.
-    """
-    if instructions and instructions_file:
-        echo("Either the --instructions-file or --instructions option must be given, not both.", err=True)
-        raise Exit(code=1)
-    if not instructions and not instructions_file:
-        echo("Either the --instructions-file or --instructions option must be given.", err=True)
-        raise Exit(code=1)
+                                             help="Number of opcodes per line while printing the shellcode"),
+                      output_format: str = Option(OUTPUT_FORMAT_PYTHON, "--output-format"),
+                      arch: str = Option(X86_ARCH, "--arch")):
+    shellcode_compiler = ShellcodeCompiler(arch=arch)
+    shellcode_assembled, count = shellcode_compiler.assemble_instructions(
+        instructions=get_instructions(instructions, instructions_file))
+    print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
 
-    if instructions_file:
-        instructions = read_instructions_from_file(instructions_file)
 
-    # Determine the architecture and mode for the Keystone engine
-    if arch == X86_ARCH:
-        ks_arch = KS_ARCH_X86
-        ks_mode = KS_MODE_32
-    elif arch == X64_ARCH:
-        ks_arch = KS_ARCH_X86
-        ks_mode = KS_MODE_64
-    else:
-        eprint(f"Unsupported architecture: {arch}")
-        sys.exit(1)
+@shellcode_app.command("run", help="Executes the compiled shellcode on the detected platform.")
+def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i"),
+                          instructions_file: str = Option(None, "--instructions-file", "-if"),
+                          interactive: bool = Option(False, "--interactive"),
+                          arch: str = Option(X86_ARCH, "--arch")):
+    shellcode_runner = ShellcodeRunner(arch=arch)
+    shellcode_compiler = ShellcodeCompiler(arch=arch)
 
-    ks = Ks(ks_arch, ks_mode)
+    shellcode_assembled, count = shellcode_compiler.assemble_instructions(
+        instructions=get_instructions(instructions, instructions_file))
 
-    try:
-        shellcode_assembled, count = ks.asm(instructions)
-        eprint(f"[+] {count} instructions have been encoded")
-    except KsError as ks_error:
-        eprint(f"Shellcode compilation failed: {ks_error}", err=True)
-        raise Exit(code=1)
+    shellcode_runner.run_shellcode(shellcode_assembled, interactive=interactive)
 
-    if run:
-        run_shellcode(encoding=shellcode_assembled,
-                      interactive=interactive,
-                      arch=arch)
-    else:
-        print_shellcode(shellcode_assembled, var_name=var_name, interval=interval, output_format=output_format)
+
+@pe_app.command(name="rva-offset-find", help="Convert RVA to file offset in a PE file.")
+def find_rva_offset_(file: str,
+                     rva: str = typer.Argument(...,
+                                               help='RVA to convert. Supports "0x" prefix for hexadecimal values.'),
+                     section_name: Optional[str] = typer.Option(None, "--section-name", "-sn",
+                                                                help='Optional. The name of the section to search through for the given --rva offset.')):
+    find_rva_offset(file=file, rva=rva, section_name=section_name)
+
+
+@pe_app.command(name="iat-print", help="Print the Import Address Table (IAT), "
+                                       "optionally filtering by DLL name and/or function name.")
+def iat_print_(file: str,
+               dll: Optional[str] = typer.Option(None, help="Filter by DLL name, case-insensitive."),
+               function: Optional[str] = typer.Option(None, help="Filter by function name, case-insensitive.")):
+    iat_print(file=file, dll=dll, function=function)
+
+
+@pe_app.command(name="bytes-display", help="Display bytes from a file starting at a specified offset.")
+def display_bytes_(file: str = typer.Argument(..., help="The path to the binary file."),
+                          offset: str = typer.Option(..., help="Offset in the file to start reading bytes."),
+                          length: int = typer.Option(..., help="Number of bytes to read and display.")):
+    display_bytes(file=file, offset=offset, length=length)
+
+@pe_app.command(name="bytes-search", help="Search for a sequence of bytes in a file.")
+def bytes_search(file: str = typer.Argument(..., help="The path to the binary file."),
+                 byte_sequence: str = typer.Option(..., help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'")):
+    search_bytes(file=file, byte_sequence=byte_sequence)
+
+
+@pe_app.command(name="eat-print", help="Parse the Export Address Table (EAT) and print it.")
+def eat_print_(file: str):
+    parse_eat(file=file)
+
+@pe_app.command(name="sections-print", help="Print details of each section in the PE file.")
+def print_sections_(file: str = typer.Argument(..., help="The path to the PE file.")):
+    print_sections(file=file)
 
 
 if __name__ == "__main__":
