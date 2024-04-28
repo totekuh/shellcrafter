@@ -9,6 +9,7 @@ from rich.table import Table
 console = Console()
 
 
+
 def validate_file(file: str):
     if not os.path.exists(file):
         console.print(f"[-] The file {file} doesn't exist.", style="bold red")
@@ -168,18 +169,11 @@ def describe_section_characteristics(characteristics):
             characteristics_desc.append(desc)
     return ", ".join(characteristics_desc)
 
-def search_bytes(file: str, byte_sequence: str):
+def search_bytes(file: str, search_sequence: bytes):
     """
     Search for a given sequence of bytes in a binary file.
     """
     validate_file(file)
-
-    # Convert string to bytes
-    try:
-        search_sequence = bytes.fromhex(byte_sequence.replace('\\x', ''))
-    except ValueError:
-        console.print(f"[-] Invalid byte sequence: {byte_sequence}", style="bold red")
-        raise typer.Exit(code=1)
 
     try:
         with open(file, 'rb') as f:
