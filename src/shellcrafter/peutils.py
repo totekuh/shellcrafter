@@ -9,6 +9,11 @@ from rich.table import Table
 console = Console()
 
 
+def validate_file(file: str):
+    if not os.path.exists(file):
+        console.print(f"[-] The file {file} doesn't exist.", style="bold red")
+        raise typer.Exit(code=-1)
+
 def is_valid_pe_file(file_path: str) -> bool:
     try:
         pefile.PE(file_path)
@@ -96,46 +101,6 @@ def iat_print(file: str,
 
     console.print(table)
 
-
-# def iat_edit(
-#         file: str,
-#         dll: str,
-#         old_address: str,
-#         function_name: str,
-#         new_address: str):
-#     """
-#     This command allows for the patching of an Import Address Table (IAT) entry within a Portable Executable (PE) file.
-#     Specify the DLL name, old function address, the function name, and the new address to effectively patch the PE file.
-#
-#     The command verifies the existence of the specified IAT entry before making any modifications.
-#     After successful validation and modification, it saves the patched PE file with a '.patched' suffix to denote the change.
-#
-#     Note: Ensure that the provided addresses and DLL names are accurate to prevent incorrect modifications.
-#     """
-#     validate_pe_file(file)
-#
-#     pe = pefile.PE(file)
-#     modified = False
-#     target_old_address = int(old_address, 16)
-#     target_new_address = int(new_address, 16)
-#
-#     for entry in pe.DIRECTORY_ENTRY_IMPORT:
-#         if dll.lower() == entry.dll.decode().lower():
-#             for imp in entry.imports:
-#                 if function_name.lower() == imp.name.decode().lower() and imp.address == target_old_address:
-#                     console.print(f"Original address of {function_name}: {hex(imp.address)}")
-#                     # Directly modify the address
-#                     imp.address = target_new_address
-#                     modified = True
-#                     console.print(f"New address of {function_name}: {hex(imp.address)}", style="bold green")
-#                     break
-#     if modified:
-#         pe.write(filename=f"{file}.patched")
-#         console.print(f"Modified PE file saved as {file}.patched", style="bold green")
-#     else:
-#         console.print("Specified entry not found. No modifications made.", style="bold red")
-
-
 def parse_eat(file: str):
     """
     Parse the Export Address Table (EAT) and print it.
@@ -175,5 +140,43 @@ def print_sections(file: str):
             hex(section.Misc_VirtualSize),
             hex(section.SizeOfRawData)
         )
+
+    console.print(table)
+
+def display_bytes(file: str, offset: str, length: int):
+    """
+    Display the specified number of bytes from a given file starting at a specific offset.
+    """
+    validate_file(file)
+
+    try:
+        offset = int(offset, 16) if offset.startswith("0x") else int(offset)
+    except ValueError:
+        console.print(f"[-] Invalid offset value: {offset}", style="bold red")
+        raise typer.Exit(code=1)
+
+    try:
+        with open(file, 'rb') as f:
+            f.seek(offset)
+            data = f.read(length)
+    except IOError as e:
+        console.print(f"Error accessing the file: {str(e)}", style="bold red")
+        raise typer.Exit(code=1)
+
+    table = Table(title="File Bytes Display")
+    table.add_column("Offset", style="cyan")
+    table.add_column("Hex", style="magenta")
+    table.add_column("ASCII", style="green")
+
+    # Display bytes in table
+    hex_values = data.hex()
+    ascii_values = ''.join([chr(b) if 32 <= b <= 126 else '.' for b in data])
+
+    # Split hex and ASCII values into manageable chunks
+    row_len = 16  # Number of bytes per row in the table
+    for i in range(0, len(data), row_len):
+        row_hex = ' '.join(hex_values[j:j+2] for j in range(i*2, min((i+row_len)*2, len(hex_values)), 2))
+        row_ascii = ascii_values[i:i+row_len]
+        table.add_row(f"{offset+i:#010x}", row_hex, row_ascii)
 
     console.print(table)

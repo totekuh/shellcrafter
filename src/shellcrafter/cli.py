@@ -198,19 +198,11 @@ def iat_print_(file: str,
     iat_print(file=file, dll=dll, function=function)
 
 
-# @pe_app.command(name="edit",
-#                 help="Edit an IAT entry by specifying the DLL name, old address, function name, and the new address to replace the old one. This command modifies the specified IAT entry if it exists, and saves the modified PE file.")
-# def iat_edit_(
-#         file: str = typer.Argument(..., help="The path to the PE file to be modified."),
-#         dll: str = typer.Argument(..., help="The name of the DLL containing the function to edit. Case-sensitive."),
-#         old_address: str = typer.Argument(...,
-#                                           help="The old (current) address of the function in hexadecimal format. Use the format 0xADDRESS."),
-#         function_name: str = typer.Argument(..., help="The name of the function whose address is to be edited."),
-#         new_address: str = typer.Argument(...,
-#                                           help="The new address to assign to the function, in hexadecimal format. Use the format 0xADDRESS.")
-# ):
-#     iat_edit(file=file, dll=dll, function=function_name, old_address=old_address, new_address=new_address)
-
+@pe_app.command(name="display-bytes", help="Display bytes from a file starting at a specified offset.")
+def display_bytes_(file: str = typer.Argument(..., help="The path to the binary file."),
+                          offset: str = typer.Option(..., help="Offset in the file to start reading bytes."),
+                          length: int = typer.Option(..., help="Number of bytes to read and display.")):
+    display_bytes(file=file, offset=offset, length=length)
 
 @pe_app.command(name="eat-print", help="Parse the Export Address Table (EAT) and print it.")
 def eat_print_(file: str):
