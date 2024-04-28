@@ -177,7 +177,6 @@ def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i
 
     shellcode_assembled, count = shellcode_compiler.assemble_instructions(
         instructions=get_instructions(instructions, instructions_file))
-
     shellcode_runner.run_shellcode(shellcode_assembled, interactive=interactive)
 
 
