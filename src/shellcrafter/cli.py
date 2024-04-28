@@ -16,6 +16,7 @@ from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     generate_load_library, \
     write_to_memory
 from find_gadgets import do_find_gadgets
+from peutils import *
 
 app = Typer(help="Shellcrafter: A tool for shellcode development and gadget finding.", add_completion=False)
 
@@ -27,6 +28,12 @@ app.add_typer(codegen_app, name="codegen")
 
 gadgets_app = Typer(help="Searches for clean, categorized gadgets from a given list of files.")
 app.add_typer(gadgets_app, name="gadgets")
+
+# Creating a sub-command group for iat operations
+pe_app = Typer(help="PE related operations")
+
+# Adding the iat sub-command group to the main app
+app.add_typer(pe_app, name="pe")
 
 DEFAULT_VAR_NAME = "shellcode"
 
@@ -173,6 +180,45 @@ def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i
 
     shellcode_runner.run_shellcode(shellcode_assembled, interactive=interactive)
 
+
+@pe_app.command(name="rva-offset-find", help="Convert RVA to file offset in a PE file.")
+def find_rva_offset_(file: str,
+                     rva: str = typer.Argument(...,
+                                               help='RVA to convert. Supports "0x" prefix for hexadecimal values.'),
+                     section_name: Optional[str] = typer.Option(None, "--section-name", "-sn",
+                                                                help='Optional. The name of the section to search through for the given --rva offset.')):
+    find_rva_offset(file=file, rva=rva, section_name=section_name)
+
+
+@pe_app.command(name="iat-print", help="Print the Import Address Table (IAT), "
+                                       "optionally filtering by DLL name and/or function name.")
+def iat_print_(file: str,
+               dll: Optional[str] = typer.Option(None, help="Filter by DLL name, case-insensitive."),
+               function: Optional[str] = typer.Option(None, help="Filter by function name, case-insensitive.")):
+    iat_print(file=file, dll=dll, function=function)
+
+
+# @pe_app.command(name="edit",
+#                 help="Edit an IAT entry by specifying the DLL name, old address, function name, and the new address to replace the old one. This command modifies the specified IAT entry if it exists, and saves the modified PE file.")
+# def iat_edit_(
+#         file: str = typer.Argument(..., help="The path to the PE file to be modified."),
+#         dll: str = typer.Argument(..., help="The name of the DLL containing the function to edit. Case-sensitive."),
+#         old_address: str = typer.Argument(...,
+#                                           help="The old (current) address of the function in hexadecimal format. Use the format 0xADDRESS."),
+#         function_name: str = typer.Argument(..., help="The name of the function whose address is to be edited."),
+#         new_address: str = typer.Argument(...,
+#                                           help="The new address to assign to the function, in hexadecimal format. Use the format 0xADDRESS.")
+# ):
+#     iat_edit(file=file, dll=dll, function=function_name, old_address=old_address, new_address=new_address)
+
+
+@pe_app.command(name="eat-print", help="Parse the Export Address Table (EAT) and print it.")
+def eat_print_(file: str):
+    parse_eat(file=file)
+
+@pe_app.command(name="sections-print", help="Print details of each section in the PE file.")
+def print_sections_(file: str = typer.Argument(..., help="The path to the PE file.")):
+    print_sections(file=file)
 
 if __name__ == "__main__":
     app()

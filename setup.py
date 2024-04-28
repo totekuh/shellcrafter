@@ -33,7 +33,8 @@ setup(
         "rich",
         "ropper",
         "capstone",
-        "typer",  # Added Typer to the list of required packages
+        "typer",
+        "pefile"
     ],
     project_urls={  # Optional
         'Bug Reports': f'{REPO_URL}/issues',
