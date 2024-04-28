@@ -198,11 +198,17 @@ def iat_print_(file: str,
     iat_print(file=file, dll=dll, function=function)
 
 
-@pe_app.command(name="display-bytes", help="Display bytes from a file starting at a specified offset.")
+@pe_app.command(name="bytes-display", help="Display bytes from a file starting at a specified offset.")
 def display_bytes_(file: str = typer.Argument(..., help="The path to the binary file."),
                           offset: str = typer.Option(..., help="Offset in the file to start reading bytes."),
                           length: int = typer.Option(..., help="Number of bytes to read and display.")):
     display_bytes(file=file, offset=offset, length=length)
+
+@pe_app.command(name="bytes-search", help="Search for a sequence of bytes in a file.")
+def bytes_search(file: str = typer.Argument(..., help="The path to the binary file."),
+                 byte_sequence: str = typer.Option(..., help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'")):
+    search_bytes(file=file, byte_sequence=byte_sequence)
+
 
 @pe_app.command(name="eat-print", help="Parse the Export Address Table (EAT) and print it.")
 def eat_print_(file: str):
@@ -211,6 +217,7 @@ def eat_print_(file: str):
 @pe_app.command(name="sections-print", help="Print details of each section in the PE file.")
 def print_sections_(file: str = typer.Argument(..., help="The path to the PE file.")):
     print_sections(file=file)
+
 
 if __name__ == "__main__":
     app()

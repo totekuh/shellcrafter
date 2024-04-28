@@ -39,6 +39,7 @@ def find_rva_offset(file: str,
     Convert RVA to file offset in a PE file.
     """
     validate_pe_file(file)
+    print(rva)
     try:
         rva_int = int(rva, 16) if rva.startswith("0x") else int(rva)
     except ValueError:
@@ -118,10 +119,9 @@ def parse_eat(file: str):
 
     console.print(table)
 
-
 def print_sections(file: str):
     """
-    Print details of each section in the PE file.
+    Print details of each section in the PE file, including their characteristics.
     """
     validate_pe_file(file)
 
@@ -131,17 +131,81 @@ def print_sections(file: str):
     table.add_column("Virtual Address", justify="right", style="magenta")
     table.add_column("Virtual Size", justify="right", style="green")
     table.add_column("Raw Size", justify="right", style="green")
+    table.add_column("Characteristics", justify="left", style="yellow")
 
     for section in pe.sections:
+        characteristics = describe_section_characteristics(section.Characteristics)
         section_name = section.Name.decode().rstrip('\x00')  # Clean up the section name
         table.add_row(
             section_name,
             hex(section.VirtualAddress),
             hex(section.Misc_VirtualSize),
-            hex(section.SizeOfRawData)
+            hex(section.SizeOfRawData),
+            characteristics
         )
 
     console.print(table)
+
+def describe_section_characteristics(characteristics):
+    """
+    Return a string describing the section characteristics.
+    """
+    flags = [
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_CNT_CODE'], "Code"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_CNT_INITIALIZED_DATA'], "Initialized Data"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_CNT_UNINITIALIZED_DATA'], "Uninitialized Data"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_DISCARDABLE'], "Discardable"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_NOT_CACHED'], "Not Cached"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_NOT_PAGED'], "Not Paged"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_SHARED'], "Shared"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_EXECUTE'], "Execute"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_READ'], "Read"),
+        (pefile.SECTION_CHARACTERISTICS['IMAGE_SCN_MEM_WRITE'], "Write")
+    ]
+    characteristics_desc = []
+    for flag, desc in flags:
+        if characteristics & flag:
+            characteristics_desc.append(desc)
+    return ", ".join(characteristics_desc)
+
+def search_bytes(file: str, byte_sequence: str):
+    """
+    Search for a given sequence of bytes in a binary file.
+    """
+    validate_file(file)
+
+    # Convert string to bytes
+    try:
+        search_sequence = bytes.fromhex(byte_sequence.replace('\\x', ''))
+    except ValueError:
+        console.print(f"[-] Invalid byte sequence: {byte_sequence}", style="bold red")
+        raise typer.Exit(code=1)
+
+    try:
+        with open(file, 'rb') as f:
+            file_content = f.read()
+    except IOError as e:
+        console.print(f"Error reading the file: {str(e)}", style="bold red")
+        raise typer.Exit(code=1)
+
+    # Search for the byte sequence in the file content
+    index = file_content.find(search_sequence)
+    if index == -1:
+        console.print("Sequence not found.", style="bold red")
+    else:
+        table = Table(title="Byte Sequence Found")
+        table.add_column("Offset", style="cyan")
+        table.add_column("Hex", style="magenta")
+        table.add_column("ASCII", style="green")
+
+        # Display the found sequence in a table
+        hex_values = search_sequence.hex()
+        ascii_values = ''.join([chr(b) if 32 <= b <= 126 else '.' for b in search_sequence])
+        row_hex = ' '.join(hex_values[j:j+2] for j in range(0, len(hex_values), 2))
+        table.add_row(f"{index:#010x}", row_hex, ascii_values)
+
+        console.print(table)
+
 
 def display_bytes(file: str, offset: str, length: int):
     """
