@@ -168,16 +168,28 @@ def compile_shellcode(instructions: str = Option(None, "--instructions", "-i"),
 
 
 @shellcode_app.command("run", help="Executes the compiled shellcode on the detected platform.")
-def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i"),
-                          instructions_file: str = Option(None, "--instructions-file", "-if"),
-                          interactive: bool = Option(False, "--interactive"),
-                          arch: str = Option(X86_ARCH, "--arch")):
+def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i", help="Inline assembly instructions to compile and run."),
+                          instructions_file: str = Option(None, "--instructions-file", "-if", help="File containing assembly instructions to compile and run."),
+                          bin_file: str = Option(None, "--bin", help="File containing raw binary shellcode to run directly."),
+                          interactive: bool = Option(False, "--interactive", help="Run shellcode in interactive mode."),
+                          arch: str = Option(X86_ARCH, "--arch", help="Architecture of the shellcode (default x86).")):
+    inputs = sum([bool(instructions), bool(instructions_file), bool(bin_file)])
+    if inputs != 1:
+        print("Error: Please specify only one of --instructions, --instructions-file, or --bin.")
+        raise Exit(code=1)
     shellcode_runner = ShellcodeRunner(arch=arch)
-    shellcode_compiler = ShellcodeCompiler(arch=arch)
 
-    shellcode_assembled, count = shellcode_compiler.assemble_instructions(
-        instructions=get_instructions(instructions, instructions_file))
-    shellcode_runner.run_shellcode(shellcode_assembled, interactive=interactive)
+    if bin_file:
+        if os.path.exists(bin_file):
+            with open(bin_file, 'rb') as file:
+                shellcode_binary = file.read()
+            shellcode_runner.run_shellcode(shellcode_binary, interactive)
+        else:
+            print(f"Error: The specified binary file does not exist: {bin_file}")
+    else:
+        shellcode_assembled, count = ShellcodeCompiler(arch).assemble_instructions(
+            get_instructions(instructions, instructions_file))
+        shellcode_runner.run_shellcode(shellcode_assembled, interactive)
 
 
 @pe_app.command(name="rva-offset-find", help="Convert RVA to file offset in a PE file.")
@@ -203,11 +215,29 @@ def display_bytes_(file: str = typer.Argument(..., help="The path to the binary 
                           length: int = typer.Option(..., help="Number of bytes to read and display.")):
     display_bytes(file=file, offset=offset, length=length)
 
-@pe_app.command(name="bytes-search", help="Search for a sequence of bytes in a file.")
+@pe_app.command(name="bytes-search", help="Search for a sequence of bytes or ASCII characters in a file.")
 def bytes_search(file: str = typer.Argument(..., help="The path to the binary file."),
-                 byte_sequence: str = typer.Option(..., help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'")):
-    search_bytes(file=file, byte_sequence=byte_sequence)
+                 bytes_: Optional[str] = typer.Option(None, "--bytes", help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'."),
+                 ascii: Optional[str] = typer.Option(None, "--ascii", help="ASCII text to search for, e.g., 'ABC'. Specify only one of --bytes or --ascii.")):
+    """
+    Search for a sequence of bytes or ASCII text in a file. Specify either --bytes or --ascii.
+    """
+    if bytes_ and ascii:
+        raise Exit("Error: Please specify either a byte sequence or an ASCII string, not both.")
+    if not bytes_ and not ascii:
+        raise Exit("Error: No search pattern provided. Please specify a byte sequence or an ASCII string.")
 
+    # Convert ASCII sequence to bytes if provided
+    if ascii:
+        search_sequence = ascii.encode()
+    # Convert string representation of byte sequence to actual bytes if provided
+    if bytes_:
+        try:
+            search_sequence = bytes.fromhex(bytes_.replace('\\x', ''))
+        except ValueError:
+            raise Exit("Error: Invalid byte sequence. Please ensure it's in the correct format, e.g., '\\x41\\x42'.")
+
+    search_bytes(file=file, search_sequence=search_sequence)
 
 @pe_app.command(name="eat-print", help="Parse the Export Address Table (EAT) and print it.")
 def eat_print_(file: str):
