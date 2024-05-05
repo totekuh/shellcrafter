@@ -11,17 +11,17 @@ section .text
 
 _start:
     ; MessageBoxA( NULL, str_message, "", 0 );
-        push 0
+        push 0x0
         push str_empty
         push str_message
-        push 0
+        push 0x0
         call _MessageBoxA@16
 
     ; ExitProcess( 0 );
-        push 0
+        push 0x0
         call _ExitProcess@4
 
 section .data
 
-str_message  db  "hack the planet", 0
-str_empty    db  0
+str_message  db  "hack the planet", 0x0
+str_empty    db  0x0
