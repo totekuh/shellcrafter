@@ -72,8 +72,8 @@ class ShellcodeRunner:
             sys.exit(1)
 
     def run_shellcode(self,
-                      shellcode,
-                      interactive):
+                      shellcode: bytes,
+                      interactive: bool):
         eprint(f"[*] Detected platform: {self.platform}")
 
         if self.platform == 'windows':
@@ -86,7 +86,7 @@ class ShellcodeRunner:
             raise ValueError("Unsupported platform or architecture.")
         eprint("[+] Shellcode execution finished")
 
-    def run_shellcode_on_linux(self, shellcode, interactive):
+    def run_shellcode_on_linux(self, shellcode: bytearray, interactive: bool):
         libc = ctypes.CDLL("libc.so.6")
         libpthread = ctypes.CDLL("libpthread.so.0")
 
@@ -133,7 +133,8 @@ class ShellcodeRunner:
 
         eprint(f"Shellcode returned: {retval.value}")
 
-    def run_shellcode_on_windows(self, shellcode, interactive):
+    def run_shellcode_on_windows(self, shellcode: bytearray,
+                                 interactive: bool):
         VirtualAlloc = ctypes.windll.kernel32.VirtualAlloc
         VirtualAlloc.restype = ctypes.c_void_p
         VirtualAlloc.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_ulong, ctypes.c_ulong]
@@ -142,32 +143,38 @@ class ShellcodeRunner:
         RtlMoveMemory.restype = None
         RtlMoveMemory.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
 
-        ptr = VirtualAlloc(None, len(shellcode), 0x3000, 0x40)
+        # Constants for memory allocation
+        MEM_COMMIT = 0x3000
+        PAGE_EXECUTE_READWRITE = 0x40
+
+        # Allocate executable memory for the shellcode
+        ptr = VirtualAlloc(None, len(shellcode), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         if not ptr:
             raise ValueError("Failed to allocate memory.")
+        print(f"[+] Allocated memory with PAGE_EXECUTE_READWRITE")
 
         buf = (ctypes.c_char * len(shellcode)).from_buffer(shellcode)
         RtlMoveMemory(ptr, buf, len(shellcode))
-        eprint(f"[*] Shellcode located at address {hex(ptr)}")
+        print(f"[*] Shellcode located at address {hex(ptr)}")
 
         if interactive:
             input("[!] Press Enter to execute shellcode")
 
-        eprint(f"[*] Executing shellcode...")
+        print(f"[*] Executing shellcode...")
 
         CreateThread = ctypes.windll.kernel32.CreateThread
         CreateThread.restype = ctypes.c_void_p
         CreateThread.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong,
                                  ctypes.c_void_p]
 
-        if self.arch == X64_ARCH:
+        if hasattr(self, 'arch') and self.arch == 'X64_ARCH':
             thread_id = ctypes.c_ulonglong()
         else:
             thread_id = ctypes.c_ulong()
 
         ht = CreateThread(None, 0, ptr, None, 0, ctypes.byref(thread_id))
         if not ht:
-            raise ValueError("Failed to create thread.")
+            raise ValueError("Failed to create thread")
 
         ctypes.windll.kernel32.WaitForSingleObject(ctypes.c_void_p(ht), -1)
 
