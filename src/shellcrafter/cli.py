@@ -16,6 +16,7 @@ from shellcode_procedure_generator import str_to_hex_little_endian_push, \
     generate_load_library, \
     write_to_memory
 from find_gadgets import do_find_gadgets
+from typing import Optional
 from peutils import *
 
 app = Typer(help="Shellcrafter: A tool for shellcode development and gadget finding.", add_completion=False)
