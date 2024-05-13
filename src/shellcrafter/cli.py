@@ -194,9 +194,9 @@ def run_shellcode_command(instructions: str = Option(None, "--instructions", "-i
 
 @pe_app.command(name="rva-offset-find", help="Convert RVA to file offset in a PE file.")
 def find_rva_offset_(file: str,
-                     rva: str = typer.Argument(...,
+                     rva: str = Argument(...,
                                                help='RVA to convert. Supports "0x" prefix for hexadecimal values.'),
-                     section_name: Optional[str] = typer.Option(None, "--section-name", "-sn",
+                     section_name: Optional[str] = Option(None, "--section-name", "-sn",
                                                                 help='Optional. The name of the section to search through for the given --rva offset.')):
     find_rva_offset(file=file, rva=rva, section_name=section_name)
 
@@ -204,21 +204,21 @@ def find_rva_offset_(file: str,
 @pe_app.command(name="iat-print", help="Print the Import Address Table (IAT), "
                                        "optionally filtering by DLL name and/or function name.")
 def iat_print_(file: str,
-               dll: Optional[str] = typer.Option(None, help="Filter by DLL name, case-insensitive."),
-               function: Optional[str] = typer.Option(None, help="Filter by function name, case-insensitive.")):
+               dll: Optional[str] = Option(None, help="Filter by DLL name, case-insensitive."),
+               function: Optional[str] = Option(None, help="Filter by function name, case-insensitive.")):
     iat_print(file=file, dll=dll, function=function)
 
 
 @pe_app.command(name="bytes-display", help="Display bytes from a file starting at a specified offset.")
-def display_bytes_(file: str = typer.Argument(..., help="The path to the binary file."),
-                          offset: str = typer.Option(..., help="Offset in the file to start reading bytes."),
-                          length: int = typer.Option(..., help="Number of bytes to read and display.")):
+def display_bytes_(file: str = Argument(..., help="The path to the binary file."),
+                          offset: str = Option(..., help="Offset in the file to start reading bytes."),
+                          length: int = Option(..., help="Number of bytes to read and display.")):
     display_bytes(file=file, offset=offset, length=length)
 
 @pe_app.command(name="bytes-search", help="Search for a sequence of bytes or ASCII characters in a file.")
-def bytes_search(file: str = typer.Argument(..., help="The path to the binary file."),
-                 bytes_: Optional[str] = typer.Option(None, "--bytes", help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'."),
-                 ascii: Optional[str] = typer.Option(None, "--ascii", help="ASCII text to search for, e.g., 'ABC'. Specify only one of --bytes or --ascii.")):
+def bytes_search(file: str = Argument(..., help="The path to the binary file."),
+                 bytes_: Optional[str] = Option(None, "--bytes", help="Byte sequence to search for, e.g., '\\x41\\x42\\x43'."),
+                 ascii: Optional[str] = Option(None, "--ascii", help="ASCII text to search for, e.g., 'ABC'. Specify only one of --bytes or --ascii.")):
     """
     Search for a sequence of bytes or ASCII text in a file. Specify either --bytes or --ascii.
     """
@@ -244,7 +244,7 @@ def eat_print_(file: str):
     parse_eat(file=file)
 
 @pe_app.command(name="sections-print", help="Print details of each section in the PE file.")
-def print_sections_(file: str = typer.Argument(..., help="The path to the PE file.")):
+def print_sections_(file: str = Argument(..., help="The path to the PE file.")):
     print_sections(file=file)
 
 
